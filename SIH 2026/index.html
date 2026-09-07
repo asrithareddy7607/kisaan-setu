@@ -1,0 +1,2835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#059669">
+  <meta name="description" content="KisanSetu - Real-time procurement queues, smart centre recommendations, and transparent agricultural tracking for farmers.">
+  <title>KisanSetu | Less Waiting. More Transparency.</title>
+
+  <!-- PWA Manifest & Favicon -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='48' fill='%23059669'/><path d='M30 65 C30 45 45 35 50 20 C55 35 70 45 70 65 C60 70 40 70 30 65 Z' fill='%23fbbf24'/><path d='M50 25 L50 65' stroke='%23064e3b' stroke-width='4' stroke-linecap='round'/></svg>">
+
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Tiro+Telugu&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            farmer: {
+              50: '#f2fbf6',
+              100: '#e1f7ea',
+              200: '#c5eed7',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+              800: '#065f46',
+              900: '#064e3b',
+              950: '#022c22',
+            },
+            soil: {
+              50: '#fdfbf7',
+              100: '#f7f4ec',
+              200: '#ece5d4',
+              700: '#8c6d3b',
+              800: '#5c4826',
+              900: '#3d3019',
+            },
+            amber: {
+              500: '#f59e0b',
+              600: '#d97706',
+              700: '#b45309',
+            }
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+            telugu: ['"Tiro Telugu"', 'sans-serif'],
+            hindi: ['"Noto Sans Devanagari"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Leaflet CSS & JS for OpenStreetMap -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- React 18 & ReactDOM & Babel Standalone -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Supabase JS Client -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .leaflet-popup-content-wrapper {
+      border-radius: 12px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+      padding: 4px;
+    }
+    .custom-pulse {
+      animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulse-ring {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: .7; transform: scale(1.05); }
+    }
+    /* Hide scrollbar for clean mobile UI */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen antialiased flex flex-col selection:bg-farmer-200">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo } = React;
+
+    // ============================================================================
+    // MULTILINGUAL DICTIONARY (English, Telugu, Hindi)
+    // ============================================================================
+    const TRANSLATIONS = {
+      en: {
+        app_name: "KisanSetu",
+        tagline: "Less Waiting. More Transparency.",
+        subtagline: "KisanSetu connects farmers and procurement centres with real-time schedules, queues, and procurement tracking.",
+        find_centres: "Find Procurement Centre",
+        track_procurement: "Track Procurement",
+        role_farmer: "Farmer Portal",
+        role_officer: "Officer Terminal",
+        role_admin: "Admin Control",
+        login_title: "Farmer Mobile Login",
+        login_subtitle: "Enter your registered mobile number for instant OTP verification",
+        phone_number: "Mobile Number",
+        enter_otp: "Enter 6-digit OTP",
+        get_otp: "Send OTP via SMS",
+        verify_otp: "Verify & Enter KisanSetu",
+        otp_sent_to: "SMS OTP sent to",
+        resend_otp: "Resend OTP",
+        demo_farmer: "Quick Demo: Farmer Ramesh (Warangal)",
+        demo_officer: "Quick Demo: Procurement Officer",
+        demo_admin: "Quick Demo: District Civil Supplies Admin",
+        profile_title: "Farmer Profile",
+        land_verification_required: "Land Passbook Authentication Required",
+        land_verif_desc: "Per Government mandate, your Pattadar Passbook & Survey number must be authenticated before registering produce.",
+        passbook_number: "Passbook / Khata Number",
+        survey_number: "Survey Number",
+        extent_acres: "Land Extent (Acres)",
+        govt_api_layer: "State RoR API Integration Layer",
+        verify_land_btn: "Authenticate via Govt Gateway",
+        verif_status_pending: "Verification Pending",
+        verif_status_verified: "Govt RoR Authenticated",
+        verif_status_rejected: "Mismatch / Rejected",
+        verif_status_unavailable: "Govt RoR Gateway Temporarily Unavailable",
+        crop_registration: "Crop Registration",
+        select_crop: "Select Crop (MSP Supported)",
+        estimated_quintals: "Estimated Quantity (Quintals)",
+        season: "Season",
+        nearby_centres: "Procurement & IKP Centres",
+        smart_recommendation: "KisanSetu Smart Recommendation",
+        book_slot: "Schedule & Generate Token",
+        live_queue: "Live Queue Dashboard",
+        current_token: "Current Token Serving",
+        farmers_ahead: "Farmers Ahead of You",
+        est_wait_time: "Estimated Wait Time",
+        tracking_timeline: "End-to-End Procurement Lifecycle",
+        payment_status: "Direct Benefit Transfer (DBT) Status",
+        voice_assistant_btn: "Voice Assistant",
+        ai_assistant_btn: "KisanSetu AI",
+        listening: "Listening to your voice...",
+        speak_now: "Speak a command in English, Telugu, or Hindi",
+        sms_inbox: "Farmer SMS Log",
+        officer_queue_mgmt: "Live Centre Queue Operations",
+        call_next: "Call Next Farmer",
+        quality_inspection: "Quality Inspection (FAQ Standards)",
+        moisture_content: "Moisture Content (%)",
+        weighing_scale: "Digital Weighbridge",
+        gross_weight: "Gross Weight (Qtl)",
+        tare_weight: "Tare Weight (Qtl)",
+        net_weight: "Net Weight (Qtl)",
+        complete_procurement: "Issue Digital Weight Slip",
+        overcrowding_alert: "Overcrowding Alert",
+        capacity_utilization: "Procurement Capacity Utilization",
+        waiting_analytics: "Avg Waiting Time (Minutes)",
+        logout: "Logout",
+        status_registered: "Registered",
+        status_verified: "Passbook Verified",
+        status_scheduled: "Slot Scheduled",
+        status_token: "Digital Token Issued",
+        status_arrived: "Arrived at Gate",
+        status_quality: "Quality Check Done",
+        status_weighed: "Weighbridge Recorded",
+        status_procured: "Procurement Complete",
+        status_payment_processing: "Payment Processing",
+        status_paid: "Paid via DBT",
+      },
+      te: {
+        app_name: "కిసాన్ సేతు",
+        tagline: "తక్కువ వేచియుండుట. సంపూర్ణ పారదర్శకత.",
+        subtagline: "కిసాన్ సేతు రైతులను మరియు కొనుగోలు కేంద్రాలను రియల్-టైమ్ షెడ్యూల్స్, క్యూలు మరియు సేకరణ ట్రాకింగ్‌తో అనుసంధానిస్తుంది.",
+        find_centres: "కొనుగోలు కేంద్రాలను కనుగొనండి",
+        track_procurement: "సేకరణను ట్రాక్ చేయండి",
+        role_farmer: "రైతు పోర్టల్",
+        role_officer: "కొనుగోలు అధికారి",
+        role_admin: "అడ్మిన్ డాష్‌బోర్డ్",
+        login_title: "రైతు మొబైల్ లాగిన్",
+        login_subtitle: "తక్షణ OTP ధృవీకరణ కోసం మీ నమోదిత మొబైల్ నంబర్‌ను నమోదు చేయండి",
+        phone_number: "మొబైల్ నంబర్",
+        enter_otp: "6-అంకెల OTP ని నమోదు చేయండి",
+        get_otp: "SMS ద్వారా OTP పంపండి",
+        verify_otp: "ధృవీకరించి ప్రవేశించండి",
+        otp_sent_to: "SMS OTP పంపబడినది:",
+        resend_otp: "OTP మళ్ళీ పంపండి",
+        demo_farmer: "రైతు డెమో: రమేష్ (వరంగల్)",
+        demo_officer: "అధికారి డెమో: సేకరణ కేంద్రం",
+        demo_admin: "అడ్మిన్ డెమో: పౌర సరఫరాల అధికారి",
+        profile_title: "రైతు ప్రొఫైల్",
+        land_verification_required: "భూమి పాస్‌బుక్ ధృవీకరణ తప్పనిసరి",
+        land_verif_desc: "ప్రభుత్వ నిబంధనల ప్రకారం, పంట నమోదు చేయడానికి పట్టాదార్ పాస్‌బుక్ & సర్వే నంబర్ తప్పనిసరిగా ధృవీకరించబడాలి.",
+        passbook_number: "పాస్‌బుక్ / ఖాతా నంబర్",
+        survey_number: "సర్వే నంబర్",
+        extent_acres: "భూమి విస్తీర్ణం (ఎకరాలు)",
+        govt_api_layer: "ధరణి / మీభూమి ప్రభుత్వ RoR API",
+        verify_land_btn: "ప్రభుత్వ గేట్‌వే ద్వారా ధృవీకరించండి",
+        verif_status_pending: "ధృవీకరణ పెండింగ్‌లో ఉంది",
+        verif_status_verified: "ధరణి/మీభూమి ధృవీకరించబడింది",
+        verif_status_rejected: "వివరాలు సరిపోలలేదు / తిరస్కరించబడింది",
+        verif_status_unavailable: "ప్రభుత్వ API గేట్‌వే తాత్కాలికంగా అందుబాటులో లేదు",
+        crop_registration: "పంట నమోదు",
+        select_crop: "పంటను ఎంచుకోండి (MSP మద్దతు ధర)",
+        estimated_quintals: "అంచనా దిగుబడి (క్వింటాళ్ళు)",
+        season: "సీజన్",
+        nearby_centres: "సేకరణ & IKP కేంద్రాలు",
+        smart_recommendation: "కిసాన్ సేతు స్మార్ట్ సిఫార్సు",
+        book_slot: "స్లాట్ బుక్ చేసి టోకెన్ పొందండి",
+        live_queue: "లైవ్ క్యూ డాష్‌బోర్డ్",
+        current_token: "ప్రస్తుతం సేవ పొందుతున్న టోకెన్",
+        farmers_ahead: "మీ ముందున్న రైతుల సంఖ్య",
+        est_wait_time: "వేచి ఉండే సుమారు సమయం",
+        tracking_timeline: "సేకరణ దశల సమగ్ర ట్రాకింగ్",
+        payment_status: "రైతు ఖాతా జమ (DBT) స్థితి",
+        voice_assistant_btn: "వాయిస్ అసిస్టెంట్",
+        ai_assistant_btn: "కిసాన్ సేతు AI",
+        listening: "మీ మాటలు వింటున్నాము...",
+        speak_now: "తెలుగు, ఇంగ్లీష్ లేదా హిందీలో మాట్లాడండి",
+        sms_inbox: "రైతు SMS సందేశాల వివరాలు",
+        officer_queue_mgmt: "లైవ్ క్యూ నిర్వహణ",
+        call_next: "తదుపరి రైతును పిలవండి",
+        quality_inspection: "నాణ్యతా ప్రమాణాల తనిఖీ",
+        moisture_content: "తేమ శాతం (%)",
+        weighing_scale: "డిజిటల్ కాటా (తూకం)",
+        gross_weight: "మొత్తం బరువు (క్వింటాళ్ళు)",
+        tare_weight: "వాహనం బరువు (క్వింటాళ్ళు)",
+        net_weight: "నికర పంట బరువు (క్వింటాళ్ళు)",
+        complete_procurement: "డిజిటల్ రసీదు జారీ చేయండి",
+        overcrowding_alert: "రద్దీ హెచ్చరిక",
+        capacity_utilization: "కేంద్రం సామర్థ్యం వినియోగం",
+        waiting_analytics: "సగటు నిరీక్షణ సమయం (నిమిషాలు)",
+        logout: "లాగౌట్",
+        status_registered: "నమోదైంది",
+        status_verified: "పాస్‌బుక్ ధృవీకరించబడింది",
+        status_scheduled: "స్లాట్ ఖరారైంది",
+        status_token: "డిజిటల్ టోకెన్ జారీ",
+        status_arrived: "కేంద్రానికి చేరుకున్నారు",
+        status_quality: "నాణ్యత తనిఖీ పూర్తయింది",
+        status_weighed: "తూకం రికార్డయింది",
+        status_procured: "సేకరణ పూర్తయింది",
+        status_payment_processing: "చెల్లింపు ప్రాసెసింగ్",
+        status_paid: "రైతు ఖాతాలో జమయింది (DBT)",
+      },
+      hi: {
+        app_name: "किसान सेतु",
+        tagline: "कम प्रतीक्षा। पूर्ण पारदर्शिता।",
+        subtagline: "किसान सेतु वास्तविक समय के शेड्यूल, लाइव कतारों और खरीद ट्रैकिंग के साथ किसानों और खरीद केंद्रों को जोड़ता है।",
+        find_centres: "खरीद केंद्र खोजें",
+        track_procurement: "खरीद ट्रैक करें",
+        role_farmer: "किसान पोर्टल",
+        role_officer: "खरीद अधिकारी",
+        role_admin: "प्रशासन डैशबोर्ड",
+        login_title: "किसान मोबाइल लॉगिन",
+        login_subtitle: "तत्काल ओटीपी सत्यापन के लिए अपना पंजीकृत मोबाइल नंबर दर्ज करें",
+        phone_number: "मोबाइल नंबर",
+        enter_otp: "6-अंकों का OTP दर्ज करें",
+        get_otp: "SMS द्वारा OTP भेजें",
+        verify_otp: "सत्यापित करें और प्रवेश करें",
+        otp_sent_to: "SMS OTP भेजा गया:",
+        resend_otp: "OTP पुन: भेजें",
+        demo_farmer: "किसान डेमो: रमेश (वारंगल)",
+        demo_officer: "अधिकारी डेमो: खरीद केंद्र",
+        demo_admin: "एडमिन डेमो: जिला नागरिक आपूर्ति",
+        profile_title: "किसान प्रोफाइल",
+        land_verification_required: "भूमि पासबुक प्रमाणीकरण अनिवार्य",
+        land_verif_desc: "सरकारी निर्देशानुसार, फसल पंजीकरण से पूर्व पट्टादार पासबुक एवं खसरा/सर्वे संख्या सत्यापित होना आवश्यक है।",
+        passbook_number: "पासबुक / खाता संख्या",
+        survey_number: "सर्वे / खसरा संख्या",
+        extent_acres: "भूमि रकबा (एकड़)",
+        govt_api_layer: "राज्य भू-अभिलेख RoR API एकीकरण",
+        verify_land_btn: "सरकारी गेटवे से सत्यापित करें",
+        verif_status_pending: "सत्यापन लंबित",
+        verif_status_verified: "भू-अभिलेख द्वारा सत्यापित",
+        verif_status_rejected: "विवरण बेमेल / अस्वीकृत",
+        verif_status_unavailable: "सरकारी API गेटवे अस्थायी रूप से अनुपलब्ध",
+        crop_registration: "फसल पंजीकरण",
+        select_crop: "फसल चुनें (MSP समर्थित)",
+        estimated_quintals: "अनुमानित मात्रा (क्विंटल)",
+        season: "सीजन",
+        nearby_centres: "खरीद एवं स्थानीय IKP केंद्र",
+        smart_recommendation: "किसान सेतु स्मार्ट सिफारिश",
+        book_slot: "स्लॉट बुक करें और टोकन पाएं",
+        live_queue: "लाइव कतार डैशबोर्ड",
+        current_token: "वर्तमान टोकन सेवा में",
+        farmers_ahead: "आपके आगे किसान",
+        est_wait_time: "अनुमानित प्रतीक्षा समय",
+        tracking_timeline: "खरीद प्रक्रिया की पूर्ण ट्रैकिंग",
+        payment_status: "प्रत्यक्ष लाभ अंतरण (DBT) स्थिति",
+        voice_assistant_btn: "वॉइस असिस्टेंट",
+        ai_assistant_btn: "किसान सेतु AI",
+        listening: "आपकी आवाज सुनी जा रही है...",
+        speak_now: "अंग्रेजी, तेलुगु या हिंदी में बोलें",
+        sms_inbox: "किसान SMS लॉग",
+        officer_queue_mgmt: "लाइव कतार प्रबंधन",
+        call_next: "अगले किसान को बुलाएं",
+        quality_inspection: "गुणवत्ता निरीक्षण (FAQ मानक)",
+        moisture_content: "नमी की मात्रा (%)",
+        weighing_scale: "डिजिटल तौल कांटा",
+        gross_weight: "सकल वजन (क्विंटल)",
+        tare_weight: "खाली वाहन का वजन (क्विंटल)",
+        net_weight: "शुद्ध फसल वजन (क्विंटल)",
+        complete_procurement: "डिजिटल रसीद जारी करें",
+        overcrowding_alert: "अत्यधिक भीड़ की चेतावनी",
+        capacity_utilization: "खरीद केंद्र क्षमता उपयोग",
+        waiting_analytics: "औसत प्रतीक्षा समय (मिनट)",
+        logout: "लॉगआउट",
+        status_registered: "पंजीकृत",
+        status_verified: "पासबुक सत्यापित",
+        status_scheduled: "स्लॉट निर्धारित",
+        status_token: "डिजिटल टोकन जारी",
+        status_arrived: "केंद्र पर पहुंचे",
+        status_quality: "गुणवत्ता जांच संपन्न",
+        status_weighed: "तौल रिकॉर्ड की गई",
+        status_procured: "खरीद संपन्न",
+        status_payment_processing: "भुगतान प्रक्रियाधीन",
+        status_paid: "DBT द्वारा सीधे खाते में जमा",
+      }
+    };
+
+    // ============================================================================
+    // OFFICIAL CROPS MASTER DATA (With 2025-26 MSP Rates)
+    // ============================================================================
+    const CROPS_DATA = [
+      { id: 'c1', name: 'Paddy (Grade A)', name_te: 'వరి (గ్రేడ్-ఎ)', name_hi: 'धान (ग्रेड-ए)', msp: 2320, maxMoisture: 17, category: 'Cereals' },
+      { id: 'c2', name: 'Paddy (Common)', name_te: 'వరి (సాధారణ)', name_hi: 'धान (सामान्य)', msp: 2300, maxMoisture: 17, category: 'Cereals' },
+      { id: 'c3', name: 'Cotton (Medium Staple)', name_te: 'పత్తి (మధ్యస్థ)', name_hi: 'कपास (मध्यम)', msp: 7121, maxMoisture: 12, category: 'Commercial' },
+      { id: 'c4', name: 'Cotton (Long Staple)', name_te: 'పత్తి (పొడవు)', name_hi: 'कपास (लंबा)', msp: 7521, maxMoisture: 12, category: 'Commercial' },
+      { id: 'c5', name: 'Maize (Corn)', name_te: 'మొక్కజొన్న', name_hi: 'मक्का', msp: 2225, maxMoisture: 14, category: 'Cereals' },
+      { id: 'c6', name: 'Wheat', name_te: 'గోధుమలు', name_hi: 'गेहूं', msp: 2425, maxMoisture: 12, category: 'Cereals' },
+      { id: 'c7', name: 'Bengal Gram (Chana)', name_te: 'శనగలు', name_hi: 'चना', msp: 5650, maxMoisture: 12, category: 'Pulses' },
+      { id: 'c8', name: 'Red Gram (Tur/Arhar)', name_te: 'కందులు', name_hi: 'अरहर / तूर', msp: 7550, maxMoisture: 12, category: 'Pulses' },
+      { id: 'c9', name: 'Soybean (Yellow)', name_te: 'సోయాబీన్', name_hi: 'सोयाबीन', msp: 4892, maxMoisture: 12, category: 'Oilseeds' },
+      { id: 'c10', name: 'Bajra (Pearl Millet)', name_te: 'సజ్జలు', name_hi: 'बाजरा', msp: 2625, maxMoisture: 14, category: 'Millets' }
+    ];
+
+    // ============================================================================
+    // MAJOR GOVT & LOCAL IKP PROCUREMENT CENTRES MASTER DATA
+    // ============================================================================
+    const INITIAL_CENTRES = [
+      {
+        id: 'cnt-1',
+        code: 'IKP-WAR-01',
+        name: 'Warangal Rural IKP Paddy Procurement Centre',
+        name_te: 'వరంగల్ రూరల్ ఐ.కె.పి వరి సేకరణ కేంద్రం',
+        name_hi: 'वारंगल ग्रामीण IKP धान खरीद केंद्र',
+        type: 'IKP',
+        district: 'Warangal',
+        mandal: 'Geesugonda',
+        lat: 17.9689,
+        lng: 79.5941,
+        distanceKm: 4.2,
+        dailyCapacityQtl: 1800,
+        currentLoadQtl: 720,
+        currentQueueCount: 4,
+        avgProcessingMins: 14,
+        operatingStatus: 'Open',
+        nextSlot: '11:30 AM Today',
+        recommendedReason: 'Recommended: Lowest wait time (14 mins) & immediate slot',
+        contactPhone: '+91 870 245 9182',
+        address: 'Near Gram Panchayat Bhavan, Geesugonda Mandi Yard'
+      },
+      {
+        id: 'cnt-2',
+        code: 'FCI-SUR-04',
+        name: 'FCI State Warehouse & Grain Godown Suryapet',
+        name_te: 'ఎఫ్.సి.ఐ రాష్ట్ర ధాన్యం గిడ్డంగి సూర్యాపేట',
+        name_hi: 'FCI राज्य अनाज गोदाम सूर्यापेट',
+        type: 'FCI',
+        district: 'Suryapet',
+        mandal: 'Suryapet Urban',
+        lat: 17.1439,
+        lng: 79.6238,
+        distanceKm: 12.8,
+        dailyCapacityQtl: 4500,
+        currentLoadQtl: 3850,
+        currentQueueCount: 22,
+        avgProcessingMins: 22,
+        operatingStatus: 'Open',
+        nextSlot: '02:00 PM Today',
+        recommendedReason: 'High capacity automated bulk weighbridge',
+        contactPhone: '+91 8684 220 102',
+        address: 'National Highway 65 Industrial Area, Suryapet'
+      },
+      {
+        id: 'cnt-3',
+        code: 'PACS-KAR-08',
+        name: 'Karimnagar PACS Co-operative Procurement Centre',
+        name_te: 'కరీంనగర్ పి.ఎ.సి.ఎస్ సహకార సేకరణ కేంద్రం',
+        name_hi: 'करीमनगर PACS सहकारी खरीद केंद्र',
+        type: 'PACS',
+        district: 'Karimnagar',
+        mandal: 'Choppadandi',
+        lat: 18.5772,
+        lng: 79.1678,
+        distanceKm: 18.5,
+        dailyCapacityQtl: 1500,
+        currentLoadQtl: 920,
+        currentQueueCount: 9,
+        avgProcessingMins: 18,
+        operatingStatus: 'Open',
+        nextSlot: '01:15 PM Today',
+        recommendedReason: 'Co-op member special subsidy & hassle-free unloading',
+        contactPhone: '+91 878 223 8810',
+        address: 'Opposite PACS Bank, Choppadandi Main Road'
+      },
+      {
+        id: 'cnt-4',
+        code: 'IKP-NAL-12',
+        name: 'Nalgonda Miryalaguda Local IKP Paddy Centre',
+        name_te: 'మిర్యాలగూడ స్థానిక ఐ.కె.పి ధాన్యం సేకరణ కేంద్రం',
+        name_hi: 'मिर्यालगुडा स्थानीय IKP धान खरीद केंद्र',
+        type: 'IKP',
+        district: 'Nalgonda',
+        mandal: 'Miryalaguda',
+        lat: 16.8715,
+        lng: 79.5644,
+        distanceKm: 7.9,
+        dailyCapacityQtl: 2200,
+        currentLoadQtl: 1100,
+        currentQueueCount: 6,
+        avgProcessingMins: 16,
+        operatingStatus: 'Open',
+        nextSlot: '12:45 PM Today',
+        recommendedReason: 'Recommended: Dedicated gunny bags & quick moisture testing',
+        contactPhone: '+91 8689 252 340',
+        address: 'APMC Market Yard Shed 3, Miryalaguda'
+      },
+      {
+        id: 'cnt-5',
+        code: 'MRK-KHM-02',
+        name: 'Markfed Cotton & Maize Procurement Yard Khammam',
+        name_te: 'మార్క్‌ఫెడ్ పత్తి మరియు మొక్కజొన్న కేంద్రం ఖమ్మం',
+        name_hi: 'मार्कफेड कपास एवं मक्का खरीद प्रांगण खम्मम',
+        type: 'Markfed',
+        district: 'Khammam',
+        mandal: 'Khammam Urban',
+        lat: 17.2473,
+        lng: 80.1514,
+        distanceKm: 24.1,
+        dailyCapacityQtl: 3500,
+        currentLoadQtl: 3200,
+        currentQueueCount: 28,
+        avgProcessingMins: 26,
+        operatingStatus: 'Open',
+        nextSlot: 'Tomorrow 09:00 AM',
+        recommendedReason: 'CCI & Markfed certified lint moisture testing labs',
+        contactPhone: '+91 8742 231 990',
+        address: 'Bypass Road, Agricultural Market Yard, Khammam'
+      },
+      {
+        id: 'cnt-6',
+        code: 'IKP-NZB-07',
+        name: 'Nizamabad Armoor IKP Self-Help Group Centre',
+        name_te: 'నిజామాబాద్ ఆర్మూర్ ఐ.కె.పి స్వయం సహాయక బృందం కేంద్రం',
+        name_hi: 'निजामाबाद आर्मूर IKP महिला स्वयं सहायता समूह केंद्र',
+        type: 'IKP',
+        district: 'Nizamabad',
+        mandal: 'Armoor',
+        lat: 18.7900,
+        lng: 78.2900,
+        distanceKm: 9.6,
+        dailyCapacityQtl: 1600,
+        currentLoadQtl: 650,
+        currentQueueCount: 5,
+        avgProcessingMins: 15,
+        operatingStatus: 'Open',
+        nextSlot: '11:45 AM Today',
+        recommendedReason: 'Operated by local IKP Mahila Samakhya with fair weighing',
+        contactPhone: '+91 8463 224 511',
+        address: 'Near Old Bus Stand, Armoor Market'
+      }
+    ];
+
+    // ============================================================================
+    // MAIN REACT APPLICATION COMPONENT
+    // ============================================================================
+    function KisanSetuApp() {
+      // 1. Language & Navigation State
+      const [lang, setLang] = useState('en');
+      const t = TRANSLATIONS[lang];
+      const [activeRoute, setActiveRoute] = useState('/'); // '/', '/login', '/farmer', '/officer', '/admin'
+      const [activeRole, setActiveRole] = useState(null); // null, 'farmer', 'officer', 'admin'
+      
+      // 2. Authentication State
+      const [phoneInput, setPhoneInput] = useState('9848022338');
+      const [otpInput, setOtpInput] = useState('');
+      const [generatedOtp, setGeneratedOtp] = useState(null);
+      const [isOtpSent, setIsOtpSent] = useState(false);
+      const [officerLoginId, setOfficerLoginId] = useState('OFF-TG-WAR-042');
+      const [officerSelectedCentre, setOfficerSelectedCentre] = useState('cnt-1');
+
+      // 3. Farmer Profile State
+      const [farmerProfile, setFarmerProfile] = useState({
+        name: 'Ramesh Reddy Thota',
+        phone: '9848022338',
+        aadhaarMask: 'XXXX-XXXX-8921',
+        state: 'Telangana',
+        district: 'Warangal',
+        mandal: 'Geesugonda',
+        village: 'Dharmaram',
+        bankAccountMask: 'XXXXXX4512',
+        ifsc: 'SBIN0020184',
+        bankName: 'State Bank of India, Geesugonda Branch'
+      });
+
+      // 4. Land Passbook & Mandatory Verification State
+      const [landRecord, setLandRecord] = useState({
+        passbookNumber: 'T-192837465',
+        khataNumber: '482',
+        surveyNumber: '142/A/2',
+        extentAcres: 4.5,
+        village: 'Dharmaram',
+        state: 'Telangana',
+        documentUploaded: true,
+        documentName: 'Pattadar_Passbook_Scan_142A.pdf'
+      });
+      const [landVerificationStatus, setLandVerificationStatus] = useState('Pending'); // 'Pending', 'Verified', 'Rejected', 'Unavailable'
+      const [verifApiSource, setVerifApiSource] = useState('Dharani Portal (Telangana)');
+      const [isVerifying, setIsVerifying] = useState(false);
+
+      // 5. Crop Registration State
+      const [selectedCropId, setSelectedCropId] = useState('c1');
+      const [cropQuantityQtl, setCropQuantityQtl] = useState(65);
+      const [cropBags, setCropBags] = useState(130);
+      const [cropSeason, setCropSeason] = useState('Kharif 2025-26');
+      const [isCropRegistered, setIsCropRegistered] = useState(false);
+
+      // 6. Centres & Recommendation State
+      const [centres, setCentres] = useState(INITIAL_CENTRES);
+      const [selectedCentreId, setSelectedCentreId] = useState('cnt-1');
+      const [filterCentreType, setFilterCentreType] = useState('All');
+
+      // 7. Digital Token & Scheduling State
+      const [selectedDate, setSelectedDate] = useState('2026-09-07');
+      const [selectedSlot, setSelectedSlot] = useState('11:30 AM - 12:30 PM');
+      const [vehicleType, setVehicleType] = useState('Tractor Trolley');
+      const [vehicleNumber, setVehicleNumber] = useState('TS 03 TA 4920');
+      const [activeToken, setActiveToken] = useState(null);
+
+      // 8. 10-Stage Lifecycle Tracking State
+      // Stages: Registered -> Verified -> Scheduled -> Token -> Arrived -> Quality -> Weighed -> Procured -> PaymentProcessing -> Paid
+      const [procurementStage, setProcurementStage] = useState(1); 
+
+      // 9. Officer Terminal Form State
+      const [inspectMoisture, setInspectMoisture] = useState(14.8);
+      const [inspectForeignMatter, setInspectForeignMatter] = useState(0.8);
+      const [inspectFaqGrade, setInspectFaqGrade] = useState('Grade A');
+      const [weighGross, setWeighGross] = useState(92.4);
+      const [weighTare, setWeighTare] = useState(27.4);
+      const [weighNet, setWeighNet] = useState(65.0);
+      const [weighBags, setWeighBags] = useState(130);
+      const [isQueuePaused, setIsQueuePaused] = useState(false);
+
+      // 10. Real-Time Queues Data
+      const [queueData, setQueueData] = useState({
+        'cnt-1': {
+          servingToken: 'KS-2026-IKP-0480',
+          tokensWaiting: [
+            { id: 'tok-prev-1', number: 'KS-2026-IKP-0481', farmer: 'Venkataiah B.', crop: 'Paddy Grade A', qtl: 45, status: 'At Gate', time: '11:15 AM' }
+          ],
+          totalServedToday: 18,
+          status: 'active'
+        }
+      });
+
+      // 11. SMS Notification History
+      const [smsMessages, setSmsMessages] = useState([
+        {
+          id: 'sms-1',
+          time: '10:30 AM',
+          phone: '9848022338',
+          text: 'KisanSetu OTP: 684291 is your verification code to access KisanSetu procurement portal. Valid for 10 mins.'
+        }
+      ]);
+      const [showSmsModal, setShowSmsModal] = useState(false);
+      const [showSupabaseModal, setShowSupabaseModal] = useState(false);
+      const [supabaseConfig, setSupabaseConfig] = useState({
+        url: 'https://vkmjqlxydbr.supabase.co',
+        anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        connected: false
+      });
+
+      // 12. Voice Assistant & AI Chat State
+      const [isVoiceActive, setIsVoiceActive] = useState(false);
+      const [voiceTranscript, setVoiceTranscript] = useState('');
+      const [voiceFeedback, setVoiceFeedback] = useState('');
+      const [showAiDrawer, setShowAiDrawer] = useState(false);
+      const [aiMessages, setAiMessages] = useState([
+        {
+          sender: 'ai',
+          text: 'Namaste Ramesh garu! I am your KisanSetu AI Assistant. You can ask me about your token, live queue, MSP rates, or nearest IKP centres. How can I help you today?',
+          time: 'Just now'
+        }
+      ]);
+      const [aiInputText, setAiInputText] = useState('');
+
+      // 13. Leaflet Map Reference
+      const mapContainerRef = useRef(null);
+      const mapInstanceRef = useRef(null);
+
+      // Audio notification player using Web Audio API
+      const playChime = (type = 'success') => {
+        try {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          if (type === 'success') {
+            osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+            osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1); // E5
+            osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.2); // G5
+            gain.gain.setValueAtTime(0.2, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.4);
+          } else if (type === 'alert') {
+            osc.frequency.setValueAtTime(440, ctx.currentTime);
+            osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
+            gain.gain.setValueAtTime(0.3, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.35);
+          }
+        } catch(e) {
+          console.log('Audio chime not supported', e);
+        }
+      };
+
+      // Voice synthesizer
+      const speakResponse = (text) => {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(text);
+          if (lang === 'te') {
+            utterance.lang = 'te-IN';
+          } else if (lang === 'hi') {
+            utterance.lang = 'hi-IN';
+          } else {
+            utterance.lang = 'en-IN';
+          }
+          utterance.rate = 0.95;
+          window.speechSynthesis.speak(utterance);
+        }
+      };
+
+      // Helper to push simulated SMS to farmer
+      const sendSmsNotification = (text) => {
+        const newMsg = {
+          id: 'sms-' + Date.now(),
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          phone: farmerProfile.phone,
+          text: text
+        };
+        setSmsMessages(prev => [newMsg, ...prev]);
+        playChime('success');
+      };
+
+      // Handle sending OTP
+      const handleSendOtp = () => {
+        if (!phoneInput || phoneInput.length < 10) {
+          alert('Please enter a valid 10-digit mobile number.');
+          return;
+        }
+        const generated = Math.floor(100000 + Math.random() * 900000).toString();
+        setGeneratedOtp(generated);
+        setIsOtpSent(true);
+        sendSmsNotification(`KisanSetu Login OTP: ${generated} is your confidential verification code. Enter this code to log in.`);
+      };
+
+      // Handle OTP Verification
+      const handleVerifyOtp = () => {
+        if (otpInput === generatedOtp || otpInput === '123456' || !generatedOtp) {
+          setActiveRole('farmer');
+          setActiveRoute('/farmer');
+          sendSmsNotification(`Welcome ${farmerProfile.name}! Logged in successfully to KisanSetu on mobile +91-${farmerProfile.phone}.`);
+        } else {
+          alert('Invalid OTP. Please check your SMS inbox or use the demo auto-fill.');
+        }
+      };
+
+      // Authenticate Land via Govt Gateway (Dharani/Meebhoomi)
+      const handleAuthenticateLand = () => {
+        setIsVerifying(true);
+        setTimeout(() => {
+          setIsVerifying(false);
+          setLandVerificationStatus('Verified');
+          setProcurementStage(prev => Math.max(prev, 2));
+          sendSmsNotification(`Govt Land Verification SUCCESS! Passbook ${landRecord.passbookNumber}, Survey ${landRecord.surveyNumber} (${landRecord.extentAcres} Acres) verified via Dharani RoR Gateway.`);
+          playChime('success');
+        }, 1200);
+      };
+
+      // Register Crop Produce
+      const handleRegisterCrop = () => {
+        if (landVerificationStatus !== 'Verified') {
+          alert('Land Passbook verification is mandatory before crop registration!');
+          return;
+        }
+        setIsCropRegistered(true);
+        setProcurementStage(prev => Math.max(prev, 2));
+        const cropObj = CROPS_DATA.find(c => c.id === selectedCropId);
+        sendSmsNotification(`Crop Registration Confirmed: ${cropObj.name}, Est. Quantity: ${cropQuantityQtl} Qtl (${cropBags} Bags) for ${cropSeason}. Recommended centres unlocked.`);
+      };
+
+      // Generate Digital Token & Book Slot
+      const handleBookSlot = (centreId) => {
+        const c = centres.find(x => x.id === centreId);
+        const tokenNum = `KS-2026-${c.type}-${Math.floor(1000 + Math.random() * 9000)}`;
+        const cropObj = CROPS_DATA.find(x => x.id === selectedCropId) || CROPS_DATA[0];
+        const newToken = {
+          number: tokenNum,
+          farmerName: farmerProfile.name,
+          phone: farmerProfile.phone,
+          cropName: cropObj.name,
+          msp: cropObj.msp,
+          quantityQtl: cropQuantityQtl,
+          bags: cropBags,
+          centreName: c.name,
+          centreCode: c.code,
+          centreType: c.type,
+          centreAddress: c.address,
+          centreContact: c.contactPhone,
+          date: selectedDate,
+          slot: selectedSlot,
+          vehicleType: vehicleType,
+          vehicleNumber: vehicleNumber,
+          queuePosition: 3,
+          farmersAhead: 2,
+          estimatedWaitMins: 28,
+          status: 'Scheduled',
+          qrHash: `KS-TOKEN|${tokenNum}|${farmerProfile.name}|${cropQuantityQtl}QTL`
+        };
+
+        setActiveToken(newToken);
+        setProcurementStage(4); // Stage 4: Token Generated
+        sendSmsNotification(`Digital Token Generated! Token No: ${tokenNum}. Centre: ${c.name}. Slot: ${selectedDate} (${selectedSlot}). Vehicle: ${vehicleNumber}. Keep Token QR ready at gate.`);
+        
+        // Add token to Centre's queue
+        setQueueData(prev => {
+          const current = prev['cnt-1'] || { servingToken: 'KS-2026-IKP-0480', tokensWaiting: [] };
+          return {
+            ...prev,
+            'cnt-1': {
+              ...current,
+              tokensWaiting: [...current.tokensWaiting, {
+                id: 'tok-farmer',
+                number: tokenNum,
+                farmer: farmerProfile.name,
+                crop: cropObj.name,
+                qtl: cropQuantityQtl,
+                status: 'En Route',
+                time: selectedSlot.split('-')[0].trim()
+              }]
+            }
+          };
+        });
+
+        // Update centre load
+        setCentres(prev => prev.map(cnt => cnt.id === centreId ? { ...cnt, currentQueueCount: cnt.currentQueueCount + 1 } : cnt));
+      };
+
+      // Officer: Call Next Token
+      const handleOfficerCallNext = () => {
+        const centreQ = queueData['cnt-1'];
+        if (!centreQ || centreQ.tokensWaiting.length === 0) {
+          alert('No more farmers waiting in queue!');
+          return;
+        }
+        const nextInLine = centreQ.tokensWaiting[0];
+        const remaining = centreQ.tokensWaiting.slice(1);
+        
+        setQueueData(prev => ({
+          ...prev,
+          'cnt-1': {
+            ...prev['cnt-1'],
+            servingToken: nextInLine.number,
+            tokensWaiting: remaining,
+            totalServedToday: (prev['cnt-1']?.totalServedToday || 0) + 1
+          }
+        }));
+
+        if (activeToken && activeToken.number === nextInLine.number) {
+          setActiveToken(prev => ({ ...prev, queuePosition: 0, farmersAhead: 0, status: 'At Gate / Called' }));
+          setProcurementStage(5); // Arrived
+          sendSmsNotification(`🚨 ATTENTION: Token ${activeToken.number} called to Weighbridge Bay 1 at ${activeToken.centreName}! Please drive your vehicle inside.`);
+          playChime('alert');
+        } else {
+          // If Ramesh's token was waiting, decrement his position
+          if (activeToken) {
+            setActiveToken(prev => ({
+              ...prev,
+              farmersAhead: Math.max(0, prev.farmersAhead - 1),
+              estimatedWaitMins: Math.max(5, prev.estimatedWaitMins - 14)
+            }));
+          }
+        }
+      };
+
+      // Officer: Complete Quality Inspection
+      const handleOfficerQualityCheck = () => {
+        setProcurementStage(6); // Quality Check Done
+        sendSmsNotification(`Quality Inspection Done! Token ${activeToken?.number || 'KS-2026-IKP-0482'}: Moisture recorded at ${inspectMoisture}% (FAQ limit ≤17%). FAQ Grade: ${inspectFaqGrade}. Approved for Weighbridge.`);
+        playChime('success');
+      };
+
+      // Officer: Complete Weighing & Final Procurement Receipt
+      const handleOfficerCompleteProcurement = () => {
+        const net = (parseFloat(weighGross) - parseFloat(weighTare)).toFixed(2);
+        setWeighNet(net);
+        setProcurementStage(8); // Stage 8: Procured
+        const cropObj = CROPS_DATA.find(x => x.id === selectedCropId) || CROPS_DATA[0];
+        const grossPay = (net * cropObj.msp).toFixed(2);
+        const receiptNo = `WSP-2026-TG-${Math.floor(10000 + Math.random() * 90000)}`;
+
+        sendSmsNotification(`Procurement Completed! Weight Slip ${receiptNo} generated. Net Weight: ${net} Quintals (${weighBags} Bags). Gross Payable Amount: ₹${Number(grossPay).toLocaleString('en-IN')}. Sent for DBT Disbursement.`);
+        playChime('success');
+
+        // Automatically simulate DBT payment processing -> Paid in 4 seconds
+        setTimeout(() => {
+          setProcurementStage(10); // Paid via DBT
+          const utr = `DBT${Math.floor(100000000000 + Math.random() * 900000000000)}`;
+          sendSmsNotification(`🎉 PAYMENT CREDITED: ₹${Number(grossPay).toLocaleString('en-IN')} deposited into Bank A/C ending in ${farmerProfile.bankAccountMask} (${farmerProfile.bankName}). Bank UTR: ${utr}. KisanSetu thanks you!`);
+          playChime('success');
+        }, 4500);
+      };
+
+      // Web Speech Voice Assistant Logic
+      const handleToggleVoiceAssistant = () => {
+        if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+          alert('Web Speech API is not supported in this browser. Please try Chrome, Edge, or Android Chrome.');
+          return;
+        }
+
+        if (isVoiceActive) {
+          setIsVoiceActive(false);
+          return;
+        }
+
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRec();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = lang === 'te' ? 'te-IN' : lang === 'hi' ? 'hi-IN' : 'en-IN';
+
+        setIsVoiceActive(true);
+        setVoiceTranscript('Listening...');
+
+        recognition.onstart = () => {
+          setVoiceFeedback('Listening to your query in ' + (lang === 'te' ? 'Telugu' : lang === 'hi' ? 'Hindi' : 'English') + '...');
+        };
+
+        recognition.onresult = (event) => {
+          const spoken = event.results[0][0].transcript.toLowerCase();
+          setVoiceTranscript(`"${spoken}"`);
+          handleProcessVoiceCommand(spoken);
+        };
+
+        recognition.onerror = (err) => {
+          console.error('Speech recognition error:', err);
+          setIsVoiceActive(false);
+          setVoiceFeedback('Voice recognition error or cancelled.');
+        };
+
+        recognition.onend = () => {
+          setIsVoiceActive(false);
+        };
+
+        recognition.start();
+      };
+
+      // Process Spoken Voice Commands
+      const handleProcessVoiceCommand = (query) => {
+        let answer = '';
+        if (query.includes('token') || query.includes('టోకెన్') || query.includes('टोकन')) {
+          if (activeToken) {
+            answer = `Your token number is ${activeToken.number}. You are booked at ${activeToken.centreName} for slot ${activeToken.slot}.`;
+          } else {
+            answer = `You do not have an active token yet. Please complete crop registration and schedule your slot.`;
+          }
+        } else if (query.includes('ahead') || query.includes('ముందు') || query.includes('आगे') || query.includes('how many')) {
+          if (activeToken) {
+            answer = `There are currently ${activeToken.farmersAhead} farmers ahead of you. Estimated wait time is approximately ${activeToken.estimatedWaitMins} minutes.`;
+          } else {
+            answer = `Currently, the nearest IKP centre at Warangal Rural has 4 farmers waiting in queue.`;
+          }
+        } else if (query.includes('centre') || query.includes('center') || query.includes('కేంద్రం') || query.includes('केंद्र') || query.includes('nearest')) {
+          const nearest = centres[0];
+          answer = `The nearest centre is ${nearest.name}, which is ${nearest.distanceKm} kilometers away with a wait time of ${nearest.avgProcessingMins} minutes.`;
+        } else if (query.includes('status') || query.includes('స్థితి') || query.includes('स्थिति') || query.includes('procurement')) {
+          const stageNames = [
+            'Registered', 'Passbook Verified', 'Produce Registered', 'Token Generated', 
+            'Arrived at Gate', 'Quality Check Done', 'Weighed', 'Procurement Complete', 'Payment Processing', 'Paid via DBT'
+          ];
+          answer = `Your procurement is currently at stage ${procurementStage}: ${stageNames[procurementStage - 1]}.`;
+        } else if (query.includes('schedule') || query.includes('షెడ్యూల్') || query.includes('शेड्यूल')) {
+          answer = `Today's procurement centres are open from 8:00 AM to 6:00 PM. Next available slot is at 11:30 AM at Warangal Rural IKP Centre.`;
+        } else {
+          answer = `I heard: ${query}. At KisanSetu, you can ask about your token, queue wait time, nearby IKP centres, or procurement payment status.`;
+        }
+
+        setVoiceFeedback(answer);
+        speakResponse(answer);
+      };
+
+      // KisanSetu AI Assistant Query Responder
+      const handleSendAiMessage = () => {
+        if (!aiInputText.trim()) return;
+        const userQ = aiInputText.trim();
+        const newMsg = { sender: 'user', text: userQ, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+        setAiMessages(prev => [...prev, newMsg]);
+        setAiInputText('');
+
+        setTimeout(() => {
+          let botReply = '';
+          const q = userQ.toLowerCase();
+          if (q.includes('token') || q.includes('queue') || q.includes('wait') || q.includes('ahead')) {
+            if (activeToken) {
+              botReply = `Your token ${activeToken.number} is scheduled at ${activeToken.centreName}. Current position: ${activeToken.farmersAhead} farmers ahead of you. Est. wait: ~${activeToken.estimatedWaitMins} mins. Arrival recommendation: Arrive 15 minutes before your slot with vehicle ${activeToken.vehicleNumber}.`;
+            } else {
+              botReply = `You haven't generated a token yet. Ensure your Pattadar Passbook is authenticated, register your produce quantity, and pick a slot to receive a digital QR token.`;
+            }
+          } else if (q.includes('msp') || q.includes('price') || q.includes('rate')) {
+            const cropObj = CROPS_DATA.find(x => x.id === selectedCropId) || CROPS_DATA[0];
+            botReply = `Official MSP for ${cropObj.name} is ₹${cropObj.msp} per quintal. Max permissible moisture is ${cropObj.maxMoisture}%. Total estimated valuation for your ${cropQuantityQtl} quintals is ₹${(cropQuantityQtl * cropObj.msp).toLocaleString('en-IN')}.`;
+          } else if (q.includes('ikp') || q.includes('centre') || q.includes('center')) {
+            botReply = `We have 6 active centres in this district including Warangal Rural IKP Centre (4.2 km), Suryapet FCI Godown (12.8 km), and Miryalaguda IKP Centre (7.9 km). Warangal Rural IKP is recommended for having the shortest live queue.`;
+          } else if (q.includes('moisture') || q.includes('quality') || q.includes('faq')) {
+            botReply = `Under Fair Average Quality (FAQ) guidelines, Paddy moisture must be 17.0% or below. Moisture above 17% attracts a pro-rata weight deduction or requires shade drying before weighing.`;
+          } else if (q.includes('payment') || q.includes('dbt') || q.includes('money') || q.includes('account')) {
+            botReply = `Payments are routed directly to your Aadhaar-linked Bank Account (${farmerProfile.bankAccountMask}, ${farmerProfile.bankName}) via Direct Benefit Transfer (DBT) within 24 to 48 hours of digital weight slip generation.`;
+          } else {
+            botReply = `KisanSetu connects you directly to government mandis and local IKP self-help group centres with real-time queue tokens, eliminating overnight wait times and unauthorized middleman cuts. You can ask me about your active token, nearest centre, or payment status.`;
+          }
+
+          setAiMessages(prev => [...prev, {
+            sender: 'ai',
+            text: botReply,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }]);
+          playChime('success');
+        }, 600);
+      };
+
+      // Leaflet Map Initialization and Pinning
+      useEffect(() => {
+        if ((activeRoute === '/farmer/centres' || activeRoute === '/farmer') && mapContainerRef.current) {
+          if (!mapInstanceRef.current) {
+            const map = L.map(mapContainerRef.current).setView([17.9689, 79.5941], 10);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            // Add custom icons and markers for each centre
+            centres.forEach(c => {
+              const markerColor = c.type === 'IKP' ? '#059669' : c.type === 'FCI' ? '#2563eb' : '#d97706';
+              const customHtml = `
+                <div style="background-color: ${markerColor}; color: white; padding: 4px 8px; border-radius: 9999px; font-weight: bold; font-size: 11px; display: flex; align-items: center; gap: 4px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); border: 2px solid white;">
+                  <span>${c.type}</span>
+                  <span style="background: rgba(255,255,255,0.25); padding: 1px 5px; border-radius: 6px;">${c.currentQueueCount}</span>
+                </div>
+              `;
+              const customIcon = L.divIcon({
+                html: customHtml,
+                className: 'custom-leaflet-pin',
+                iconSize: [80, 30],
+                iconAnchor: [40, 15]
+              });
+
+              const marker = L.marker([c.lat, c.lng], { icon: customIcon }).addTo(map);
+              marker.bindPopup(`
+                <div class="p-1">
+                  <div class="flex items-center gap-1.5 mb-1">
+                    <span class="text-xs px-1.5 py-0.5 rounded font-bold ${c.type === 'IKP' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}">${c.type} Centre</span>
+                    <span class="text-xs text-slate-500 font-medium">${c.distanceKm} km</span>
+                  </div>
+                  <h4 class="font-bold text-slate-900 text-sm leading-tight">${c.name}</h4>
+                  <p class="text-xs text-slate-600 mt-1">${c.address}</p>
+                  <div class="mt-2 text-xs border-t border-slate-100 pt-2 flex items-center justify-between">
+                    <span class="font-semibold text-emerald-700">Queue: ${c.currentQueueCount} Farmers</span>
+                    <span class="text-slate-500">Wait: ~${c.avgProcessingMins}m</span>
+                  </div>
+                </div>
+              `);
+            });
+
+            mapInstanceRef.current = map;
+          }
+        }
+        return () => {
+          // Cleanup map on unmount if route changes
+        };
+      }, [activeRoute, centres]);
+
+      // Re-trigger Lucide icons when DOM changes
+      useEffect(() => {
+        if (window.lucide) {
+          window.lucide.createIcons();
+        }
+      });
+
+      // Filtered centres list
+      const filteredCentres = useMemo(() => {
+        if (filterCentreType === 'All') return centres;
+        return centres.filter(c => c.type === filterCentreType);
+      }, [centres, filterCentreType]);
+
+      // Active crop object
+      const activeCrop = useMemo(() => {
+        return CROPS_DATA.find(c => c.id === selectedCropId) || CROPS_DATA[0];
+      }, [selectedCropId]);
+
+      // ============================================================================
+      // RENDER SECTION
+      // ============================================================================
+      return (
+        <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
+          
+          {/* TOP BAR / NAVIGATION HEADER */}
+          <header className="sticky top-0 z-40 bg-farmer-900 text-white shadow-md">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center justify-between h-16">
+                
+                {/* Brand & Logo */}
+                <div 
+                  className="flex items-center gap-2.5 cursor-pointer"
+                  onClick={() => setActiveRoute('/')}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-farmer-600 border border-farmer-500/50 flex items-center justify-center text-amber-400 shadow-inner">
+                    <i data-lucide="wheat" className="w-6 h-6"></i>
+                  </div>
+                  <div>
+                    <span className="text-xl font-extrabold tracking-tight text-white flex items-center gap-1.5">
+                      {t.app_name}
+                      <span className="text-[10px] bg-amber-500/20 text-amber-300 font-semibold px-2 py-0.5 rounded-full border border-amber-500/30">
+                        2026 PWA
+                      </span>
+                    </span>
+                    <p className="text-[11px] text-emerald-200/80 font-medium hidden sm:block">
+                      {t.tagline}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Role Switcher & Controls */}
+                <div className="flex items-center gap-2 sm:gap-3">
+                  
+                  {/* Language Switcher */}
+                  <div className="relative inline-flex bg-farmer-950/60 rounded-lg p-0.5 border border-farmer-700/50 text-xs">
+                    <button 
+                      onClick={() => setLang('en')}
+                      className={`px-2.5 py-1 rounded font-medium transition ${lang === 'en' ? 'bg-farmer-600 text-white font-bold shadow' : 'text-emerald-200 hover:text-white'}`}
+                    >
+                      EN
+                    </button>
+                    <button 
+                      onClick={() => setLang('te')}
+                      className={`px-2.5 py-1 rounded font-medium transition ${lang === 'te' ? 'bg-farmer-600 text-white font-bold shadow' : 'text-emerald-200 hover:text-white'}`}
+                    >
+                      తెలుగు
+                    </button>
+                    <button 
+                      onClick={() => setLang('hi')}
+                      className={`px-2.5 py-1 rounded font-medium transition ${lang === 'hi' ? 'bg-farmer-600 text-white font-bold shadow' : 'text-emerald-200 hover:text-white'}`}
+                    >
+                      हिंदी
+                    </button>
+                  </div>
+
+                  {/* SMS Drawer Button with Badge */}
+                  <button 
+                    onClick={() => setShowSmsModal(true)}
+                    className="relative bg-farmer-800 hover:bg-farmer-700 p-2 rounded-lg text-emerald-100 transition border border-farmer-700 flex items-center gap-1.5 text-xs font-semibold"
+                    title="Simulated SMS Drawer"
+                  >
+                    <i data-lucide="message-square" className="w-4 h-4 text-amber-300"></i>
+                    <span className="hidden md:inline">SMS</span>
+                    <span className="w-2 h-2 rounded-full bg-amber-400 absolute -top-1 -right-1"></span>
+                  </button>
+
+                  {/* Supabase Config / Status Button */}
+                  <button 
+                    onClick={() => setShowSupabaseModal(true)}
+                    className="bg-farmer-800 hover:bg-farmer-700 p-2 rounded-lg text-emerald-100 transition border border-farmer-700 flex items-center gap-1.5 text-xs font-semibold"
+                    title="Supabase Database Status"
+                  >
+                    <i data-lucide="database" className="w-4 h-4 text-emerald-300"></i>
+                    <span className="hidden md:inline">Supabase</span>
+                  </button>
+
+                  {/* Role Navigation Pills */}
+                  <div className="hidden lg:flex items-center gap-1.5 bg-farmer-950/40 p-1 rounded-xl border border-farmer-800">
+                    <button
+                      onClick={() => { setActiveRole('farmer'); setActiveRoute('/farmer'); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${activeRole === 'farmer' ? 'bg-emerald-600 text-white shadow-sm' : 'text-emerald-200 hover:bg-farmer-800/60'}`}
+                    >
+                      <i data-lucide="user" className="w-3.5 h-3.5"></i>
+                      {t.role_farmer}
+                    </button>
+                    <button
+                      onClick={() => { setActiveRole('officer'); setActiveRoute('/officer'); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${activeRole === 'officer' ? 'bg-amber-600 text-white shadow-sm' : 'text-emerald-200 hover:bg-farmer-800/60'}`}
+                    >
+                      <i data-lucide="clipboard-check" className="w-3.5 h-3.5"></i>
+                      {t.role_officer}
+                    </button>
+                    <button
+                      onClick={() => { setActiveRole('admin'); setActiveRoute('/admin'); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${activeRole === 'admin' ? 'bg-blue-600 text-white shadow-sm' : 'text-emerald-200 hover:bg-farmer-800/60'}`}
+                    >
+                      <i data-lucide="layout-dashboard" className="w-3.5 h-3.5"></i>
+                      {t.role_admin}
+                    </button>
+                  </div>
+
+                  {/* Mobile Role Switch Button */}
+                  <button 
+                    onClick={() => {
+                      if (!activeRole || activeRole === 'farmer') {
+                        setActiveRole('officer');
+                        setActiveRoute('/officer');
+                      } else if (activeRole === 'officer') {
+                        setActiveRole('admin');
+                        setActiveRoute('/admin');
+                      } else {
+                        setActiveRole('farmer');
+                        setActiveRoute('/farmer');
+                      }
+                    }}
+                    className="lg:hidden bg-farmer-800 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold border border-farmer-700 flex items-center gap-1"
+                  >
+                    <i data-lucide="arrow-left-right" className="w-3.5 h-3.5 text-amber-300"></i>
+                    <span>{activeRole ? activeRole.toUpperCase() : 'PORTAL'}</span>
+                  </button>
+
+                  {/* Farmer Logout / Login Toggle */}
+                  {activeRole ? (
+                    <button 
+                      onClick={() => { setActiveRole(null); setActiveRoute('/'); }}
+                      className="bg-red-950/80 hover:bg-red-900 text-red-200 border border-red-800/60 p-2 rounded-lg text-xs font-semibold flex items-center"
+                      title={t.logout}
+                    >
+                      <i data-lucide="log-out" className="w-4 h-4"></i>
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => setActiveRoute('/login')}
+                      className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 py-1.5 rounded-lg text-xs font-bold transition shadow"
+                    >
+                      Farmer Login
+                    </button>
+                  )}
+
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* VOICE & AI FLOATING ACTION BAR (BOTTOM RIGHT) */}
+          <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-2.5 pointer-events-auto">
+            {/* AI Assistant Drawer Button */}
+            <button
+              onClick={() => setShowAiDrawer(true)}
+              className="bg-farmer-800 hover:bg-farmer-700 text-white font-bold px-3.5 py-2 rounded-full shadow-xl border border-farmer-600 flex items-center gap-2 text-xs transition transform hover:scale-105 active:scale-95"
+            >
+              <div className="w-6 h-6 rounded-full bg-amber-400 text-slate-900 flex items-center justify-center font-bold">
+                <i data-lucide="sparkles" className="w-3.5 h-3.5"></i>
+              </div>
+              <span>{t.ai_assistant_btn}</span>
+            </button>
+
+            {/* Voice Assistant Mic Button */}
+            <button
+              onClick={handleToggleVoiceAssistant}
+              className={`w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-white transition transform hover:scale-105 active:scale-95 border-2 ${isVoiceActive ? 'bg-red-600 border-red-300 animate-pulse' : 'bg-farmer-600 hover:bg-farmer-500 border-emerald-300'}`}
+              title="Speak voice query (English, Telugu, Hindi)"
+            >
+              <i data-lucide={isVoiceActive ? "mic" : "mic"} className="w-6 h-6"></i>
+            </button>
+          </div>
+
+          {/* VOICE FEEDBACK OVERLAY BANNER */}
+          {voiceFeedback && (
+            <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-900 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <i data-lucide="volume-2" className="w-4 h-4 text-amber-600 flex-shrink-0"></i>
+                <span><strong>Voice Assistant:</strong> {voiceFeedback}</span>
+              </div>
+              <button onClick={() => setVoiceFeedback('')} className="text-amber-700 hover:text-amber-900 font-bold ml-2">✕</button>
+            </div>
+          )}
+
+          {/* MAIN VIEW CONTENT CONTAINER */}
+          <main className="flex-1">
+            
+            {/* ========================================================================= */}
+            {/* ROUTE: LANDING PAGE ( / )                                                 */}
+            {/* ========================================================================= */}
+            {activeRoute === '/' && (
+              <div className="w-full">
+                
+                {/* Hero Section */}
+                <section className="bg-gradient-to-b from-farmer-900 via-farmer-800 to-farmer-900 text-white pt-12 pb-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+                  <div className="max-w-5xl mx-auto text-center relative z-10">
+                    
+                    {/* Badge */}
+                    <div className="inline-flex items-center gap-2 bg-emerald-800/80 border border-emerald-600/60 px-3 py-1 rounded-full text-xs font-semibold text-emerald-200 mb-6 backdrop-blur">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                      <span>Empowering 2026 Procurement: FCI, Markfed, PACS & Local IKP Centres</span>
+                    </div>
+
+                    <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white mb-5 leading-tight">
+                      {t.tagline}
+                    </h1>
+                    
+                    <p className="text-base sm:text-xl text-emerald-100/90 max-w-3xl mx-auto mb-8 font-normal leading-relaxed">
+                      {t.subtagline}
+                    </p>
+
+                    {/* Quick CTA Buttons */}
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 max-w-md mx-auto">
+                      <button
+                        onClick={() => { setActiveRole('farmer'); setActiveRoute('/farmer/centres'); }}
+                        className="w-full sm:w-auto px-6 py-3.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2"
+                      >
+                        <i data-lucide="map-pin" className="w-5 h-5 text-slate-900"></i>
+                        {t.find_centres}
+                      </button>
+                      <button
+                        onClick={() => { setActiveRole('farmer'); setActiveRoute('/farmer/track'); }}
+                        className="w-full sm:w-auto px-6 py-3.5 bg-farmer-700/80 hover:bg-farmer-600 text-white font-semibold rounded-xl border border-emerald-500/50 shadow transition flex items-center justify-center gap-2"
+                      >
+                        <i data-lucide="clock" className="w-5 h-5 text-amber-300"></i>
+                        {t.track_procurement}
+                      </button>
+                    </div>
+
+                    {/* Quick Demo Access Bar */}
+                    <div className="mt-10 pt-8 border-t border-emerald-800/60 flex flex-wrap items-center justify-center gap-2 text-xs text-emerald-200">
+                      <span className="font-semibold text-emerald-300 mr-2">Instant Role Demo:</span>
+                      <button 
+                        onClick={() => { setActiveRole('farmer'); setActiveRoute('/farmer'); }}
+                        className="bg-emerald-950/70 hover:bg-emerald-900 text-white px-3 py-1.5 rounded-lg border border-emerald-700 transition"
+                      >
+                        🌱 Farmer Dashboard
+                      </button>
+                      <button 
+                        onClick={() => { setActiveRole('officer'); setActiveRoute('/officer'); }}
+                        className="bg-emerald-950/70 hover:bg-emerald-900 text-white px-3 py-1.5 rounded-lg border border-emerald-700 transition"
+                      >
+                        🏢 Officer Live Queue
+                      </button>
+                      <button 
+                        onClick={() => { setActiveRole('admin'); setActiveRoute('/admin'); }}
+                        className="bg-emerald-950/70 hover:bg-emerald-900 text-white px-3 py-1.5 rounded-lg border border-emerald-700 transition"
+                      >
+                        📊 Admin Analytics
+                      </button>
+                    </div>
+
+                  </div>
+                </section>
+
+                {/* 3 Core Value Transformations (Highlight Grid) */}
+                <section className="py-14 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    
+                    {/* Transformation 1 */}
+                    <div className="bg-white rounded-2xl p-6 shadow-xl border border-slate-100 hover:shadow-2xl transition">
+                      <div className="w-12 h-12 rounded-xl bg-red-50 border border-red-100 flex items-center justify-center text-red-600 mb-4">
+                        <i data-lucide="timer-off" className="w-6 h-6"></i>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs font-bold text-red-600 uppercase tracking-wider mb-1">
+                        <span>Past Bottleneck</span>
+                        <i data-lucide="arrow-right" className="w-3.5 h-3.5"></i>
+                        <span className="text-emerald-700">KisanSetu Solves</span>
+                      </div>
+                      <h3 className="text-lg font-bold text-slate-900 mb-2">Long Waiting → Live Queue</h3>
+                      <p className="text-sm text-slate-600 leading-relaxed">
+                        Say goodbye to 36-hour tractor queue logjams outside mandis. Live token counter tells you exact arrival time and farmers ahead.
+                      </p>
+                    </div>
+
+                    {/* Transformation 2 */}
+                    <div className="bg-white rounded-2xl p-6 shadow-xl border border-slate-100 hover:shadow-2xl transition">
+                      <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 mb-4">
+                        <i data-lucide="calendar-x" className="w-6 h-6"></i>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs font-bold text-amber-600 uppercase tracking-wider mb-1">
+                        <span>Past Bottleneck</span>
+                        <i data-lucide="arrow-right" className="w-3.5 h-3.5"></i>
+                        <span className="text-emerald-700">KisanSetu Solves</span>
+                      </div>
+                      <h3 className="text-lg font-bold text-slate-900 mb-2">Unclear Schedule → Smart Slots</h3>
+                      <p className="text-sm text-slate-600 leading-relaxed">
+                        Intelligent load balancing across FCI, Markfed, PACS, and local IKP centres based on live queue, distance, and daily capacity.
+                      </p>
+                    </div>
+
+                    {/* Transformation 3 */}
+                    <div className="bg-white rounded-2xl p-6 shadow-xl border border-slate-100 hover:shadow-2xl transition">
+                      <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-4">
+                        <i data-lucide="search-x" className="w-6 h-6"></i>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">
+                        <span>Past Bottleneck</span>
+                        <i data-lucide="arrow-right" className="w-3.5 h-3.5"></i>
+                        <span className="text-emerald-700">KisanSetu Solves</span>
+                      </div>
+                      <h3 className="text-lg font-bold text-slate-900 mb-2">Uncertain Status → 10-Stage Tracking</h3>
+                      <p className="text-sm text-slate-600 leading-relaxed">
+                        Radical transparency from land passbook verification to moisture check, electronic weighing, and Direct Benefit Transfer (DBT) to bank accounts.
+                      </p>
+                    </div>
+
+                  </div>
+                </section>
+
+                {/* Real Centres Overview Section */}
+                <section className="py-10 bg-slate-100 border-t border-slate-200">
+                  <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                      <div>
+                        <span className="text-xs font-bold text-farmer-700 uppercase tracking-wider">Procurement Network</span>
+                        <h2 className="text-2xl font-extrabold text-slate-900">Major Govt & Local IKP Centres</h2>
+                      </div>
+                      <button
+                        onClick={() => { setActiveRole('farmer'); setActiveRoute('/farmer/centres'); }}
+                        className="text-xs font-bold text-farmer-700 hover:text-farmer-800 flex items-center gap-1 self-start"
+                      >
+                        View Interactive OpenStreetMap <i data-lucide="arrow-up-right" className="w-4 h-4"></i>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {centres.slice(0, 3).map(cnt => (
+                        <div key={cnt.id} className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cnt.type === 'IKP' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}`}>
+                                {cnt.type} Centre
+                              </span>
+                              <span className="text-xs font-bold text-emerald-700">{cnt.distanceKm} km away</span>
+                            </div>
+                            <h4 className="font-bold text-slate-900 text-sm mb-1">{cnt.name}</h4>
+                            <p className="text-xs text-slate-500 mb-3">{cnt.address}</p>
+                          </div>
+                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                            <span className="text-slate-600">Queue: <strong>{cnt.currentQueueCount} Farmers</strong></span>
+                            <span className="text-slate-600">Wait: <strong>~{cnt.avgProcessingMins}m</strong></span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+
+              </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* ROUTE: FARMER LOGIN WITH MOBILE OTP ( /login )                            */}
+            {/* ========================================================================= */}
+            {activeRoute === '/login' && (
+              <div className="max-w-md mx-auto my-10 px-4">
+                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 sm:p-8">
+                  
+                  <div className="text-center mb-6">
+                    <div className="w-14 h-14 rounded-2xl bg-farmer-100 text-farmer-700 flex items-center justify-center mx-auto mb-3">
+                      <i data-lucide="smartphone" className="w-7 h-7"></i>
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-900">{t.login_title}</h2>
+                    <p className="text-xs text-slate-500 mt-1">{t.login_subtitle}</p>
+                  </div>
+
+                  {/* Mobile Input */}
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        {t.phone_number}
+                      </label>
+                      <div className="relative flex rounded-xl shadow-sm">
+                        <span className="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-slate-300 bg-slate-50 text-slate-500 text-sm font-bold">
+                          +91
+                        </span>
+                        <input
+                          type="tel"
+                          value={phoneInput}
+                          onChange={(e) => setPhoneInput(e.target.value)}
+                          placeholder="e.g. 9848022338"
+                          className="flex-1 min-w-0 block w-full px-3 py-2.5 rounded-none rounded-r-xl border border-slate-300 text-slate-900 text-sm font-semibold focus:ring-farmer-500 focus:border-farmer-500"
+                        />
+                      </div>
+                    </div>
+
+                    {!isOtpSent ? (
+                      <button
+                        onClick={handleSendOtp}
+                        className="w-full py-3 bg-farmer-600 hover:bg-farmer-700 text-white font-bold rounded-xl text-sm transition shadow flex items-center justify-center gap-2"
+                      >
+                        <i data-lucide="send" className="w-4 h-4"></i>
+                        {t.get_otp}
+                      </button>
+                    ) : (
+                      <div className="space-y-3 pt-2">
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs font-semibold text-slate-700">
+                              {t.enter_otp}
+                            </label>
+                            <span className="text-[11px] text-emerald-600 font-bold">
+                              Auto-sent to SMS: {generatedOtp}
+                            </span>
+                          </div>
+                          <input
+                            type="text"
+                            maxLength="6"
+                            value={otpInput}
+                            onChange={(e) => setOtpInput(e.target.value)}
+                            placeholder="e.g. 684291"
+                            className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-slate-900 text-center text-lg font-bold tracking-widest focus:ring-farmer-500 focus:border-farmer-500"
+                          />
+                        </div>
+
+                        <button
+                          onClick={handleVerifyOtp}
+                          className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-sm transition shadow flex items-center justify-center gap-2"
+                        >
+                          <i data-lucide="check-circle" className="w-4 h-4"></i>
+                          {t.verify_otp}
+                        </button>
+
+                        <div className="flex items-center justify-between text-xs pt-1">
+                          <button 
+                            onClick={handleSendOtp}
+                            className="text-farmer-700 font-semibold hover:underline"
+                          >
+                            {t.resend_otp}
+                          </button>
+                          <button 
+                            onClick={() => setOtpInput(generatedOtp || '684291')}
+                            className="text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200"
+                          >
+                            Auto-fill OTP
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Quick Demo Login Option */}
+                    <div className="pt-4 border-t border-slate-100 text-center">
+                      <button
+                        onClick={() => {
+                          setPhoneInput('9848022338');
+                          setActiveRole('farmer');
+                          setActiveRoute('/farmer');
+                          sendSmsNotification('Logged in as Farmer Ramesh Reddy Thota.');
+                        }}
+                        className="text-xs font-semibold text-farmer-700 hover:text-farmer-800 bg-farmer-50 border border-farmer-200 px-3 py-2 rounded-xl w-full"
+                      >
+                        ⚡ 1-Click Quick Demo Login (Ramesh Reddy)
+                      </button>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* ROUTE: FARMER PORTAL & DASHBOARD ( /farmer/* )                            */}
+            {/* ========================================================================= */}
+            {activeRole === 'farmer' && (
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                
+                {/* Farmer Sub-Nav Bar */}
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-2 mb-6 flex items-center justify-between overflow-x-auto no-scrollbar gap-1">
+                  <div className="flex items-center gap-1 text-xs font-semibold">
+                    <button
+                      onClick={() => setActiveRoute('/farmer')}
+                      className={`px-3 py-2 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap ${activeRoute === '/farmer' ? 'bg-farmer-600 text-white font-bold' : 'text-slate-600 hover:bg-slate-100'}`}
+                    >
+                      <i data-lucide="layout-grid" className="w-3.5 h-3.5"></i>
+                      <span>Dashboard</span>
+                    </button>
+                    <button
+                      onClick={() => setActiveRoute('/farmer/land-verification')}
+                      className={`px-3 py-2 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap ${activeRoute === '/farmer/land-verification' ? 'bg-farmer-600 text-white font-bold' : 'text-slate-600 hover:bg-slate-100'}`}
+                    >
+                      <i data-lucide="shield-check" className="w-3.5 h-3.5"></i>
+                      <span>Land Passbook</span>
+                      {landVerificationStatus === 'Verified' && (
+                        <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setActiveRoute('/farmer/produce')}
+                      className={`px-3 py-2 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap ${activeRoute === '/farmer/produce' ? 'bg-farmer-600 text-white font-bold' : 'text-slate-600 hover:bg-slate-100'}`}
+                    >
+                      <i data-lucide="sprout" className="w-3.5 h-3.5"></i>
+                      <span>Register Crop</span>
+                    </button>
+                    <button
+                      onClick={() => setActiveRoute('/farmer/centres')}
+                      className={`px-3 py-2 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap ${activeRoute === '/farmer/centres' ? 'bg-farmer-600 text-white font-bold' : 'text-slate-600 hover:bg-slate-100'}`}
+                    >
+                      <i data-lucide="map" className="w-3.5 h-3.5"></i>
+                      <span>Centres & IKP Map</span>
+                    </button>
+                    <button
+                      onClick={() => setActiveRoute('/farmer/token')}
+                      className={`px-3 py-2 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap ${activeRoute === '/farmer/token' ? 'bg-farmer-600 text-white font-bold' : 'text-slate-600 hover:bg-slate-100'}`}
+                    >
+                      <i data-lucide="qr-code" className="w-3.5 h-3.5"></i>
+                      <span>Digital Token</span>
+                    </button>
+                    <button
+                      onClick={() => setActiveRoute('/farmer/track')}
+                      className={`px-3 py-2 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap ${activeRoute === '/farmer/track' ? 'bg-farmer-600 text-white font-bold' : 'text-slate-600 hover:bg-slate-100'}`}
+                    >
+                      <i data-lucide="git-commit" className="w-3.5 h-3.5"></i>
+                      <span>Procurement Tracking</span>
+                    </button>
+                  </div>
+
+                  <div className="hidden md:flex items-center gap-2 pr-2 text-xs">
+                    <span className="text-slate-500 font-medium">Logged in:</span>
+                    <span className="font-bold text-slate-800">{farmerProfile.name}</span>
+                    <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px]">
+                      +91 {farmerProfile.phone}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 10-STAGE PROGRESS BAR BANNER */}
+                <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <i data-lucide="activity" className="w-4 h-4 text-farmer-600"></i>
+                      Live Procurement Status
+                    </span>
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                      Stage {procurementStage} of 10: {
+                        procurementStage === 1 ? t.status_registered :
+                        procurementStage === 2 ? t.status_verified :
+                        procurementStage === 3 ? t.status_scheduled :
+                        procurementStage === 4 ? t.status_token :
+                        procurementStage === 5 ? t.status_arrived :
+                        procurementStage === 6 ? t.status_quality :
+                        procurementStage === 7 ? t.status_weighed :
+                        procurementStage === 8 ? t.status_procured :
+                        procurementStage === 9 ? t.status_payment_processing :
+                        t.status_paid
+                      }
+                    </span>
+                  </div>
+
+                  {/* Visual Step Bar */}
+                  <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-farmer-600 h-full rounded-full transition-all duration-500 ease-out"
+                      style={{ width: `${(procurementStage / 10) * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
+
+                {/* ------------------------------------------------------------- */}
+                {/* SUB-VIEW 1: FARMER OVERVIEW DASHBOARD (/farmer)               */}
+                {/* ------------------------------------------------------------- */}
+                {activeRoute === '/farmer' && (
+                  <div className="space-y-6">
+                    
+                    {/* Top Stat Summary Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      
+                      {/* Stat 1: Land Status */}
+                      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold text-slate-500">Land Passbook</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${landVerificationStatus === 'Verified' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                            {landVerificationStatus}
+                          </span>
+                        </div>
+                        <div className="text-lg font-bold text-slate-900">{landRecord.surveyNumber}</div>
+                        <p className="text-xs text-slate-500">{landRecord.extentAcres} Acres • {landRecord.village}</p>
+                      </div>
+
+                      {/* Stat 2: Active Token */}
+                      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold text-slate-500">Digital Token</span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                            {activeToken ? activeToken.status : 'Not Generated'}
+                          </span>
+                        </div>
+                        <div className="text-lg font-bold text-slate-900">{activeToken ? activeToken.number : 'No Active Slot'}</div>
+                        <p className="text-xs text-slate-500">{activeToken ? activeToken.slot : 'Book slot below'}</p>
+                      </div>
+
+                      {/* Stat 3: Live Queue Ahead */}
+                      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold text-slate-500">Farmers Ahead</span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                            Live
+                          </span>
+                        </div>
+                        <div className="text-lg font-bold text-slate-900">{activeToken ? activeToken.farmersAhead : '0'} Farmers</div>
+                        <p className="text-xs text-slate-500">Wait: {activeToken ? `~${activeToken.estimatedWaitMins} mins` : 'Select centre'}</p>
+                      </div>
+
+                      {/* Stat 4: DBT Payment */}
+                      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold text-slate-500">MSP Valuation</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${procurementStage >= 10 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>
+                            {procurementStage >= 10 ? 'Credited' : 'Est.'}
+                          </span>
+                        </div>
+                        <div className="text-lg font-bold text-slate-900">
+                          ₹{Number(cropQuantityQtl * activeCrop.msp).toLocaleString('en-IN')}
+                        </div>
+                        <p className="text-xs text-slate-500">@ ₹{activeCrop.msp}/Qtl MSP</p>
+                      </div>
+
+                    </div>
+
+                    {/* Active Token Banner or Call-To-Action */}
+                    {activeToken ? (
+                      <div className="bg-gradient-to-r from-emerald-900 to-farmer-800 rounded-2xl p-6 text-white shadow-xl">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div>
+                            <div className="inline-flex items-center gap-2 bg-emerald-700/60 px-3 py-1 rounded-full text-xs font-semibold text-emerald-200 mb-2">
+                              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                              Active Token in Queue
+                            </div>
+                            <h3 className="text-2xl font-bold">{activeToken.number}</h3>
+                            <p className="text-sm text-emerald-100 mt-1">
+                              Centre: <strong>{activeToken.centreName}</strong> ({activeToken.centreType}) • Slot: {activeToken.slot}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => setActiveRoute('/farmer/token')}
+                              className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition shadow"
+                            >
+                              View Token & QR Code
+                            </button>
+                            <button
+                              onClick={() => setActiveRoute('/farmer/track')}
+                              className="px-4 py-2.5 bg-emerald-700/80 hover:bg-emerald-600 text-white font-semibold rounded-xl text-xs border border-emerald-500/50"
+                            >
+                              Live Tracking
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="alert-triangle" className="w-5 h-5"></i>
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-slate-900 text-sm">Step 1 Required: Land Passbook Authentication</h4>
+                            <p className="text-xs text-slate-600 mt-0.5">
+                              Please verify your survey & passbook via Dharani / Meebhoomi RoR gateway to unlock crop registration.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setActiveRoute('/farmer/land-verification')}
+                          className="px-4 py-2 bg-farmer-600 hover:bg-farmer-700 text-white font-bold rounded-xl text-xs transition self-start sm:self-auto"
+                        >
+                          Verify Passbook Now
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Quick Interactive OpenStreetMap in Dashboard */}
+                    <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                            <i data-lucide="map-pin" className="w-4 h-4 text-farmer-600"></i>
+                            Live Procurement Map (FCI, Markfed & Local IKP Centres)
+                          </h3>
+                          <p className="text-xs text-slate-500">Real-time queue loads across nearby mandis</p>
+                        </div>
+                        <button
+                          onClick={() => setActiveRoute('/farmer/centres')}
+                          className="text-xs font-bold text-farmer-700 hover:text-farmer-800"
+                        >
+                          Full Screen Map &raquo;
+                        </button>
+                      </div>
+                      <div 
+                        ref={mapContainerRef} 
+                        className="w-full h-72 rounded-xl overflow-hidden border border-slate-200 z-10"
+                      ></div>
+                    </div>
+
+                  </div>
+                )}
+
+                {/* ------------------------------------------------------------- */}
+                {/* SUB-VIEW 2: MANDATORY LAND PASSBOOK VERIFICATION              */}
+                {/* ------------------------------------------------------------- */}
+                {activeRoute === '/farmer/land-verification' && (
+                  <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
+                    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
+                      <div className="w-12 h-12 rounded-xl bg-farmer-100 text-farmer-700 flex items-center justify-center">
+                        <i data-lucide="shield-check" className="w-6 h-6"></i>
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-slate-900">{t.land_verification_required}</h2>
+                        <p className="text-xs text-slate-500">{t.land_verif_desc}</p>
+                      </div>
+                    </div>
+
+                    {/* Status Alert */}
+                    <div className={`p-4 rounded-xl mb-6 flex items-center justify-between ${landVerificationStatus === 'Verified' ? 'bg-emerald-50 border border-emerald-200 text-emerald-900' : 'bg-amber-50 border border-amber-200 text-amber-900'}`}>
+                      <div className="flex items-center gap-2.5">
+                        <i data-lucide={landVerificationStatus === 'Verified' ? 'check-circle-2' : 'clock'} className={`w-5 h-5 ${landVerificationStatus === 'Verified' ? 'text-emerald-600' : 'text-amber-600'}`}></i>
+                        <div>
+                          <span className="text-xs font-bold uppercase tracking-wider block">Status: {landVerificationStatus}</span>
+                          <span className="text-xs opacity-90">
+                            {landVerificationStatus === 'Verified' ? 'Pattadar Passbook verified against state land records.' : 'Awaiting authentication via official Government Gateway.'}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded bg-white shadow-sm border">
+                        {verifApiSource}
+                      </span>
+                    </div>
+
+                    {/* Form Fields */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">{t.passbook_number}</label>
+                        <input
+                          type="text"
+                          value={landRecord.passbookNumber}
+                          onChange={(e) => setLandRecord({ ...landRecord, passbookNumber: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-semibold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">{t.survey_number}</label>
+                        <input
+                          type="text"
+                          value={landRecord.surveyNumber}
+                          onChange={(e) => setLandRecord({ ...landRecord, surveyNumber: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-semibold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Khata Number</label>
+                        <input
+                          type="text"
+                          value={landRecord.khataNumber}
+                          onChange={(e) => setLandRecord({ ...landRecord, khataNumber: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-semibold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">{t.extent_acres}</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={landRecord.extentAcres}
+                          onChange={(e) => setLandRecord({ ...landRecord, extentAcres: parseFloat(e.target.value) })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-semibold"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Document Upload Simulator */}
+                    <div className="mb-6 p-4 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <i data-lucide="file-text" className="w-8 h-8 text-slate-500"></i>
+                        <div>
+                          <div className="text-xs font-bold text-slate-800">{landRecord.documentName}</div>
+                          <div className="text-[11px] text-slate-500">PDF scan attached • 1.4 MB</div>
+                        </div>
+                      </div>
+                      <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded">
+                        Uploaded
+                      </span>
+                    </div>
+
+                    {/* Government Gateway Integration Buttons */}
+                    <div className="space-y-3">
+                      <button
+                        disabled={isVerifying}
+                        onClick={handleAuthenticateLand}
+                        className={`w-full py-3 rounded-xl font-bold text-sm shadow transition flex items-center justify-center gap-2 ${landVerificationStatus === 'Verified' ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-farmer-600 hover:bg-farmer-700 text-white'}`}
+                      >
+                        {isVerifying ? (
+                          <>
+                            <i data-lucide="loader-2" className="w-4 h-4 animate-spin"></i>
+                            Connecting to Dharani RoR API Gateway...
+                          </>
+                        ) : landVerificationStatus === 'Verified' ? (
+                          <>
+                            <i data-lucide="check-circle" className="w-4 h-4 text-emerald-600"></i>
+                            Passbook Successfully Verified
+                          </>
+                        ) : (
+                          <>
+                            <i data-lucide="link" className="w-4 h-4"></i>
+                            {t.verify_land_btn}
+                          </>
+                        )}
+                      </button>
+
+                      {landVerificationStatus === 'Verified' && (
+                        <button
+                          onClick={() => setActiveRoute('/farmer/produce')}
+                          className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-sm transition shadow flex items-center justify-center gap-2"
+                        >
+                          Proceed to Crop Registration &raquo;
+                        </button>
+                      )}
+                    </div>
+
+                  </div>
+                )}
+
+                {/* ------------------------------------------------------------- */}
+                {/* SUB-VIEW 3: CROP REGISTRATION                                 */}
+                {/* ------------------------------------------------------------- */}
+                {activeRoute === '/farmer/produce' && (
+                  <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
+                    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
+                      <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center">
+                        <i data-lucide="sprout" className="w-6 h-6"></i>
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-slate-900">{t.crop_registration}</h2>
+                        <p className="text-xs text-slate-500">Register crop under verified Survey {landRecord.surveyNumber}</p>
+                      </div>
+                    </div>
+
+                    {/* Verification check lock */}
+                    {landVerificationStatus !== 'Verified' && (
+                      <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-center gap-3">
+                        <i data-lucide="lock" className="w-5 h-5 text-red-600 flex-shrink-0"></i>
+                        <div className="text-xs text-red-800">
+                          <strong>Registration Locked:</strong> You must authenticate your Pattadar Passbook before registering produce.
+                          <button onClick={() => setActiveRoute('/farmer/land-verification')} className="ml-2 font-bold underline">
+                            Verify Now
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-4">
+                      {/* Crop Picker */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">{t.select_crop}</label>
+                        <select
+                          value={selectedCropId}
+                          onChange={(e) => setSelectedCropId(e.target.value)}
+                          className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-900 bg-white"
+                        >
+                          {CROPS_DATA.map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.name} — MSP ₹{c.msp}/Qtl (Max Moisture {c.maxMoisture}%)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Quantity & Bags */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">{t.estimated_quintals}</label>
+                          <input
+                            type="number"
+                            value={cropQuantityQtl}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              setCropQuantityQtl(val);
+                              setCropBags(Math.round(val * 2));
+                            }}
+                            className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">Gunny Bags Estimate</label>
+                          <input
+                            type="number"
+                            value={cropBags}
+                            onChange={(e) => setCropBags(parseInt(e.target.value) || 0)}
+                            className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Valuation Card */}
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center justify-between">
+                        <div>
+                          <span className="text-xs text-emerald-800 font-semibold block">Official MSP Guaranteed Valuation</span>
+                          <span className="text-xl font-extrabold text-emerald-900">
+                            ₹{(cropQuantityQtl * activeCrop.msp).toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                        <span className="text-xs bg-emerald-200/80 text-emerald-900 font-bold px-2.5 py-1 rounded-lg">
+                          @ ₹{activeCrop.msp}/Qtl
+                        </span>
+                      </div>
+
+                      <button
+                        onClick={handleRegisterCrop}
+                        disabled={landVerificationStatus !== 'Verified'}
+                        className={`w-full py-3 font-bold rounded-xl text-sm transition shadow flex items-center justify-center gap-2 ${landVerificationStatus === 'Verified' ? 'bg-farmer-600 hover:bg-farmer-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                      >
+                        <i data-lucide="check" className="w-4 h-4"></i>
+                        Confirm Produce & Find Nearest Centres
+                      </button>
+
+                      {isCropRegistered && (
+                        <div className="pt-2">
+                          <button
+                            onClick={() => setActiveRoute('/farmer/centres')}
+                            className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-sm transition shadow flex items-center justify-center gap-2"
+                          >
+                            Explore Recommended Centres &raquo;
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+                )}
+
+                {/* ------------------------------------------------------------- */}
+                {/* SUB-VIEW 4: CENTRES LIST & SMART RECOMMENDATION               */}
+                {/* ------------------------------------------------------------- */}
+                {activeRoute === '/farmer/centres' && (
+                  <div className="space-y-6">
+                    
+                    {/* Header with Type Filters */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                      <div>
+                        <h2 className="text-lg font-bold text-slate-900">{t.nearby_centres}</h2>
+                        <p className="text-xs text-slate-500">Ranked by real-time queue, wait time, and distance</p>
+                      </div>
+
+                      {/* Filter Tabs */}
+                      <div className="flex items-center gap-1.5 text-xs">
+                        {['All', 'IKP', 'FCI', 'Markfed', 'PACS'].map(type => (
+                          <button
+                            key={type}
+                            onClick={() => setFilterCentreType(type)}
+                            className={`px-3 py-1.5 rounded-lg font-bold transition ${filterCentreType === type ? 'bg-farmer-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                          >
+                            {type}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Centre Cards Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {filteredCentres.map(c => (
+                        <div 
+                          key={c.id}
+                          className={`bg-white rounded-2xl p-5 border shadow-sm flex flex-col justify-between transition hover:shadow-md ${selectedCentreId === c.id ? 'border-farmer-500 ring-2 ring-farmer-500/20' : 'border-slate-200'}`}
+                        >
+                          <div>
+                            {/* Top Badges */}
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${c.type === 'IKP' ? 'bg-emerald-100 text-emerald-800' : c.type === 'FCI' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}>
+                                  {c.type} Centre
+                                </span>
+                                <span className="text-xs font-bold text-slate-500">{c.code}</span>
+                              </div>
+                              <span className="text-xs font-bold text-emerald-700">{c.distanceKm} km away</span>
+                            </div>
+
+                            <h3 className="font-bold text-slate-900 text-base mb-1">{c.name}</h3>
+                            <p className="text-xs text-slate-600 mb-3">{c.address}</p>
+
+                            {/* Recommendation Reason Badge */}
+                            <div className="bg-emerald-50 text-emerald-900 text-xs font-semibold px-3 py-1.5 rounded-xl mb-4 border border-emerald-200/60 flex items-center gap-1.5">
+                              <i data-lucide="sparkles" className="w-3.5 h-3.5 text-amber-600 flex-shrink-0"></i>
+                              <span>{c.recommendedReason}</span>
+                            </div>
+
+                            {/* Queue Metrics */}
+                            <div className="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl mb-4 text-center">
+                              <div>
+                                <span className="text-[10px] text-slate-500 uppercase font-bold block">Live Queue</span>
+                                <span className="text-sm font-extrabold text-slate-900">{c.currentQueueCount} Farmers</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-slate-500 uppercase font-bold block">Est. Wait</span>
+                                <span className="text-sm font-extrabold text-slate-900">~{c.avgProcessingMins} mins</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-slate-500 uppercase font-bold block">Next Slot</span>
+                                <span className="text-xs font-bold text-emerald-700">{c.nextSlot}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Action Button */}
+                          <button
+                            onClick={() => {
+                              setSelectedCentreId(c.id);
+                              handleBookSlot(c.id);
+                              setActiveRoute('/farmer/token');
+                            }}
+                            className="w-full py-2.5 bg-farmer-600 hover:bg-farmer-700 text-white font-bold rounded-xl text-xs transition shadow flex items-center justify-center gap-2"
+                          >
+                            <i data-lucide="calendar" className="w-4 h-4"></i>
+                            Select Centre & Book Slot
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                  </div>
+                )}
+
+                {/* ------------------------------------------------------------- */}
+                {/* SUB-VIEW 5: DIGITAL TOKEN & QR PASS                           */}
+                {/* ------------------------------------------------------------- */}
+                {activeRoute === '/farmer/token' && (
+                  <div className="max-w-md mx-auto">
+                    {activeToken ? (
+                      <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
+                        
+                        {/* Token Header Banner */}
+                        <div className="bg-farmer-900 text-white p-6 text-center relative">
+                          <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-300 mb-1">
+                            Official Digital Procurement Token
+                          </div>
+                          <div className="text-3xl font-extrabold text-amber-400 tracking-wider">
+                            {activeToken.number}
+                          </div>
+                          <div className="mt-2 text-xs text-emerald-100 flex items-center justify-center gap-2">
+                            <span>{activeToken.centreType} Centre</span> • <span>{activeToken.date}</span>
+                          </div>
+                        </div>
+
+                        {/* Visual QR Code Generator (SVG Simulation) */}
+                        <div className="p-6 text-center border-b border-dashed border-slate-200 bg-slate-50 flex flex-col items-center">
+                          <div className="p-3 bg-white rounded-2xl shadow-md border border-slate-200">
+                            <svg className="w-40 h-40" viewBox="0 0 100 100">
+                              <rect width="100" height="100" fill="white"/>
+                              {/* Finder patterns */}
+                              <rect x="5" y="5" width="25" height="25" fill="#064e3b" rx="3"/>
+                              <rect x="10" y="10" width="15" height="15" fill="white" rx="2"/>
+                              <rect x="13" y="13" width="9" height="9" fill="#064e3b"/>
+
+                              <rect x="70" y="5" width="25" height="25" fill="#064e3b" rx="3"/>
+                              <rect x="75" y="10" width="15" height="15" fill="white" rx="2"/>
+                              <rect x="78" y="13" width="9" height="9" fill="#064e3b"/>
+
+                              <rect x="5" y="70" width="25" height="25" fill="#064e3b" rx="3"/>
+                              <rect x="10" y="75" width="15" height="15" fill="white" rx="2"/>
+                              <rect x="13" y="78" width="9" height="9" fill="#064e3b"/>
+
+                              {/* Matrix dots */}
+                              <rect x="35" y="10" width="6" height="6" fill="#059669"/>
+                              <rect x="45" y="15" width="8" height="6" fill="#059669"/>
+                              <rect x="58" y="8" width="6" height="6" fill="#059669"/>
+
+                              <rect x="10" y="38" width="6" height="6" fill="#059669"/>
+                              <rect x="22" y="45" width="8" height="6" fill="#059669"/>
+                              <rect x="35" y="35" width="12" height="12" fill="#064e3b" rx="2"/>
+
+                              <rect x="55" y="40" width="15" height="6" fill="#059669"/>
+                              <rect x="75" y="38" width="6" height="12" fill="#064e3b"/>
+
+                              <rect x="38" y="58" width="6" height="14" fill="#059669"/>
+                              <rect x="52" y="65" width="12" height="8" fill="#059669"/>
+                              <rect x="70" y="68" width="8" height="8" fill="#064e3b"/>
+                            </svg>
+                          </div>
+                          <span className="text-[11px] text-slate-500 mt-2 font-medium">
+                            Scan at Centre Gate to enter Live Queue
+                          </span>
+                        </div>
+
+                        {/* Token Details */}
+                        <div className="p-6 space-y-3 text-xs">
+                          <div className="flex justify-between py-1 border-b border-slate-100">
+                            <span className="text-slate-500 font-medium">Farmer Name</span>
+                            <span className="font-bold text-slate-900">{activeToken.farmerName}</span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-slate-100">
+                            <span className="text-slate-500 font-medium">Registered Crop</span>
+                            <span className="font-bold text-slate-900">{activeToken.cropName}</span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-slate-100">
+                            <span className="text-slate-500 font-medium">Estimated Quantity</span>
+                            <span className="font-bold text-slate-900">{activeToken.quantityQtl} Qtl ({activeToken.bags} Bags)</span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-slate-100">
+                            <span className="text-slate-500 font-medium">Procurement Centre</span>
+                            <span className="font-bold text-slate-900 text-right">{activeToken.centreName}</span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-slate-100">
+                            <span className="text-slate-500 font-medium">Scheduled Window</span>
+                            <span className="font-bold text-emerald-700">{activeToken.slot}</span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-slate-100">
+                            <span className="text-slate-500 font-medium">Registered Vehicle</span>
+                            <span className="font-bold text-slate-900">{activeToken.vehicleNumber} ({activeToken.vehicleType})</span>
+                          </div>
+                          <div className="flex justify-between py-1">
+                            <span className="text-slate-500 font-medium">Live Queue Position</span>
+                            <span className="font-extrabold text-amber-600">{activeToken.farmersAhead} farmers ahead (~{activeToken.estimatedWaitMins}m wait)</span>
+                          </div>
+                        </div>
+
+                        {/* Bottom Actions */}
+                        <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-2">
+                          <button
+                            onClick={() => sendSmsNotification(`Token ${activeToken.number} re-sent to +91-${farmerProfile.phone}. Slot: ${activeToken.slot}. Centre: ${activeToken.centreName}`)}
+                            className="flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl text-xs transition flex items-center justify-center gap-1.5"
+                          >
+                            <i data-lucide="message-square" className="w-3.5 h-3.5"></i>
+                            SMS to Mobile
+                          </button>
+                          <button
+                            onClick={() => setActiveRoute('/farmer/track')}
+                            className="flex-1 py-2.5 bg-farmer-600 hover:bg-farmer-700 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-1.5"
+                          >
+                            <i data-lucide="arrow-right" className="w-3.5 h-3.5"></i>
+                            Track Status
+                          </button>
+                        </div>
+
+                      </div>
+                    ) : (
+                      <div className="bg-white rounded-2xl p-8 text-center border border-slate-200">
+                        <i data-lucide="ticket" className="w-12 h-12 text-slate-300 mx-auto mb-3"></i>
+                        <h3 className="font-bold text-slate-800 mb-1">No Active Token Generated</h3>
+                        <p className="text-xs text-slate-500 mb-4">Select a procurement centre to schedule your slot.</p>
+                        <button
+                          onClick={() => setActiveRoute('/farmer/centres')}
+                          className="px-4 py-2 bg-farmer-600 text-white font-bold text-xs rounded-xl shadow"
+                        >
+                          Find Centres &raquo;
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ------------------------------------------------------------- */}
+                {/* SUB-VIEW 6: END-TO-END PROCUREMENT TRACKING                   */}
+                {/* ------------------------------------------------------------- */}
+                {activeRoute === '/farmer/track' && (
+                  <div className="max-w-3xl mx-auto space-y-6">
+                    
+                    {/* Live Progress Card */}
+                    <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+                      <div className="flex items-center justify-between mb-6 pb-3 border-b border-slate-100">
+                        <div>
+                          <h2 className="text-lg font-bold text-slate-900">{t.tracking_timeline}</h2>
+                          <p className="text-xs text-slate-500">Token: {activeToken ? activeToken.number : 'KS-2026-IKP-0482'}</p>
+                        </div>
+                        <span className="text-xs font-bold text-emerald-800 bg-emerald-100 px-3 py-1 rounded-full">
+                          Stage {procurementStage} of 10
+                        </span>
+                      </div>
+
+                      {/* 10-Stage Timeline List */}
+                      <div className="space-y-4">
+                        {[
+                          { step: 1, title: 'Farmer Registration & Mobile Authentication', desc: 'Mobile +91 9848022338 authenticated with OTP' },
+                          { step: 2, title: 'Pattadar Passbook RoR Verification', desc: 'Passbook T-192837465 authenticated via Dharani Gateway' },
+                          { step: 3, title: 'Crop Produce Registered', desc: `${activeCrop.name}, ${cropQuantityQtl} Quintals estimated` },
+                          { step: 4, title: 'Centre Slot & Digital Token Generated', desc: `Token ${activeToken?.number || 'KS-2026-IKP-0482'} generated with QR Pass` },
+                          { step: 5, title: 'Arrival at Centre & Gate Clearance', desc: 'Vehicle entered through automated weighbridge checkpoint' },
+                          { step: 6, title: 'Quality & Moisture Inspection (FAQ Standard)', desc: `Moisture: ${inspectMoisture}% • Grade: ${inspectFaqGrade}` },
+                          { step: 7, title: 'Electronic Weighbridge Weight Slip', desc: `Gross: ${weighGross} Qtl • Tare: ${weighTare} Qtl • Net: ${weighNet} Qtl` },
+                          { step: 8, title: 'Procurement Complete & Digital Receipt Issued', desc: 'Crop unloaded into FCI/IKP storage godown' },
+                          { step: 9, title: 'Direct Benefit Transfer (DBT) Processing', desc: 'Payment file dispatched to PFMS / Reserve Bank of India gateway' },
+                          { step: 10, title: 'Disbursement Paid into Bank Account', desc: `Net ₹${Number(weighNet * activeCrop.msp).toLocaleString('en-IN')} credited to A/C ending in ${farmerProfile.bankAccountMask}` }
+                        ].map((item) => {
+                          const isCompleted = procurementStage >= item.step;
+                          const isCurrent = procurementStage === item.step;
+                          return (
+                            <div key={item.step} className="flex items-start gap-3">
+                              <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${isCompleted ? 'bg-farmer-600 text-white' : isCurrent ? 'bg-amber-500 text-slate-950 ring-4 ring-amber-100' : 'bg-slate-200 text-slate-500'}`}>
+                                {isCompleted ? '✓' : item.step}
+                              </div>
+                              <div className="flex-1 pb-2">
+                                <div className={`text-sm font-bold ${isCompleted ? 'text-slate-900' : 'text-slate-400'}`}>
+                                  {item.title}
+                                </div>
+                                <div className="text-xs text-slate-500 mt-0.5">
+                                  {item.desc}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                    </div>
+
+                    {/* Direct Benefit Transfer (DBT) Payment Card */}
+                    <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+                      <h3 className="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
+                        <i data-lucide="credit-card" className="w-4 h-4 text-farmer-600"></i>
+                        {t.payment_status}
+                      </h3>
+
+                      <div className="bg-slate-50 rounded-xl p-4 space-y-2.5 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Gross Procurement Amount</span>
+                          <span className="font-bold text-slate-900">₹{(cropQuantityQtl * activeCrop.msp).toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Moisture Deductions (if &gt; 17%)</span>
+                          <span className="font-bold text-emerald-700">₹0.00 (Within FAQ Limits)</span>
+                        </div>
+                        <div className="flex justify-between pt-2 border-t border-slate-200 text-sm font-extrabold text-slate-900">
+                          <span>Total Net Payable</span>
+                          <span className="text-farmer-700">₹{(cropQuantityQtl * activeCrop.msp).toLocaleString('en-IN')}</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                        <span className="text-slate-500">Crediting to Account:</span>
+                        <span className="font-bold text-slate-800">{farmerProfile.bankAccountMask} ({farmerProfile.bankName})</span>
+                      </div>
+                    </div>
+
+                  </div>
+                )}
+
+              </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* ROUTE: PROCUREMENT OFFICER TERMINAL ( /officer )                          */}
+            {/* ========================================================================= */}
+            {activeRole === 'officer' && (
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                
+                {/* Officer Terminal Top Header */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center">
+                      <i data-lucide="badge-check" className="w-6 h-6"></i>
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">Officer Terminal</span>
+                      <h2 className="text-xl font-extrabold text-slate-900">Warangal Rural IKP Paddy Centre (IKP-WAR-01)</h2>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => {
+                        setIsQueuePaused(!isQueuePaused);
+                        sendSmsNotification(`Queue Status Announcement: Queue has been ${!isQueuePaused ? 'PAUSED for maintenance' : 'RESUMED'}.`);
+                      }}
+                      className={`px-4 py-2 rounded-xl font-bold text-xs transition border flex items-center gap-1.5 ${isQueuePaused ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-amber-100 text-amber-900 border-amber-300'}`}
+                    >
+                      <i data-lucide={isQueuePaused ? "play" : "pause"} className="w-3.5 h-3.5"></i>
+                      {isQueuePaused ? 'Resume Live Queue' : 'Pause Queue'}
+                    </button>
+                    <button
+                      onClick={handleOfficerCallNext}
+                      className="px-5 py-2.5 bg-farmer-600 hover:bg-farmer-700 text-white font-bold rounded-xl text-xs transition shadow flex items-center gap-2"
+                    >
+                      <i data-lucide="megaphone" className="w-4 h-4 text-amber-300"></i>
+                      {t.call_next}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Main Operations Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  
+                  {/* Left Column: Live Queue Monitor */}
+                  <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+                      <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                        <i data-lucide="users" className="w-4 h-4 text-farmer-600"></i>
+                        Live Waiting Tokens
+                      </h3>
+                      <span className="text-xs font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                        {queueData['cnt-1']?.tokensWaiting?.length || 0} Waiting
+                      </span>
+                    </div>
+
+                    {/* Current Token in Bay */}
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-4">
+                      <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">
+                        Currently Serving at Bay 1
+                      </span>
+                      <div className="text-xl font-extrabold text-emerald-900">
+                        {queueData['cnt-1']?.servingToken || 'None'}
+                      </div>
+                      <span className="text-xs text-emerald-700 font-medium">Farmer at inspection platform</span>
+                    </div>
+
+                    {/* Tokens List */}
+                    <div className="space-y-2">
+                      {queueData['cnt-1']?.tokensWaiting?.map((tok, idx) => (
+                        <div key={tok.id || idx} className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between text-xs">
+                          <div>
+                            <div className="font-bold text-slate-900">{tok.number}</div>
+                            <div className="text-slate-500">{tok.farmer} • {tok.qtl} Qtl</div>
+                          </div>
+                          <span className="font-bold text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200">
+                            #{idx + 1} in line
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Middle Column: Quality Inspection Terminal */}
+                  <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+                      <i data-lucide="flask-conical" className="w-4 h-4 text-amber-600"></i>
+                      <h3 className="font-bold text-slate-900 text-sm">{t.quality_inspection}</h3>
+                    </div>
+
+                    <div className="space-y-4 text-xs">
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <label className="font-semibold text-slate-700">{t.moisture_content}</label>
+                          <span className="font-bold text-emerald-700">{inspectMoisture}% (Limit ≤ 17%)</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="10"
+                          max="22"
+                          step="0.1"
+                          value={inspectMoisture}
+                          onChange={(e) => setInspectMoisture(parseFloat(e.target.value))}
+                          className="w-full accent-farmer-600"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <label className="font-semibold text-slate-700">Foreign Matter (%)</label>
+                          <span className="font-bold text-slate-800">{inspectForeignMatter}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="5"
+                          step="0.1"
+                          value={inspectForeignMatter}
+                          onChange={(e) => setInspectForeignMatter(parseFloat(e.target.value))}
+                          className="w-full accent-farmer-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-700 mb-1 block">Fair Average Quality (FAQ) Grade</label>
+                        <select
+                          value={inspectFaqGrade}
+                          onChange={(e) => setInspectFaqGrade(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 font-semibold bg-white"
+                        >
+                          <option value="Grade A">Grade A (Super FAQ)</option>
+                          <option value="Common">Common Standard</option>
+                          <option value="Below FAQ">Below Specification (Reject)</option>
+                        </select>
+                      </div>
+
+                      <button
+                        onClick={handleOfficerQualityCheck}
+                        className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl transition shadow flex items-center justify-center gap-1.5"
+                      >
+                        <i data-lucide="check" className="w-4 h-4"></i>
+                        Approve Quality & Advance
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Digital Weighbridge Terminal */}
+                  <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+                      <i data-lucide="scale" className="w-4 h-4 text-blue-600"></i>
+                      <h3 className="font-bold text-slate-900 text-sm">{t.weighing_scale}</h3>
+                    </div>
+
+                    <div className="space-y-3 text-xs">
+                      <div>
+                        <label className="font-semibold text-slate-700 mb-1 block">{t.gross_weight}</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={weighGross}
+                          onChange={(e) => {
+                            const g = parseFloat(e.target.value) || 0;
+                            setWeighGross(g);
+                            setWeighNet((g - weighTare).toFixed(2));
+                          }}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold text-slate-900"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-700 mb-1 block">{t.tare_weight}</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={weighTare}
+                          onChange={(e) => {
+                            const tr = parseFloat(e.target.value) || 0;
+                            setWeighTare(tr);
+                            setWeighNet((weighGross - tr).toFixed(2));
+                          }}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold text-slate-900"
+                        />
+                      </div>
+
+                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-center">
+                        <span className="font-bold text-slate-600">{t.net_weight}</span>
+                        <span className="text-base font-extrabold text-farmer-700">{weighNet} Quintals</span>
+                      </div>
+
+                      <button
+                        onClick={handleOfficerCompleteProcurement}
+                        className="w-full py-3 bg-farmer-600 hover:bg-farmer-700 text-white font-bold rounded-xl transition shadow flex items-center justify-center gap-2"
+                      >
+                        <i data-lucide="printer" className="w-4 h-4 text-amber-300"></i>
+                        {t.complete_procurement}
+                      </button>
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* ROUTE: ADMIN MONITORING & ANALYTICS ( /admin )                            */}
+            {/* ========================================================================= */}
+            {activeRole === 'admin' && (
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+                
+                {/* Admin Top Banner */}
+                <div className="bg-farmer-900 text-white rounded-2xl p-6 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">Civil Supplies Administration</span>
+                    <h2 className="text-2xl font-extrabold">District Agricultural Procurement Oversight</h2>
+                    <p className="text-xs text-emerald-200 mt-1">Monitoring 6 Active Centres (FCI, Markfed, PACS, and local IKP centres)</p>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1.5 rounded-lg bg-emerald-800 text-emerald-200 text-xs font-bold border border-emerald-700 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                      All Systems Live
+                    </span>
+                  </div>
+                </div>
+
+                {/* Overcrowding Alert & Capacity Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  
+                  {/* Metric 1 */}
+                  <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+                    <span className="text-xs font-semibold text-slate-500 block mb-1">Total Procured Today</span>
+                    <div className="text-2xl font-black text-slate-900">14,820 Qtl</div>
+                    <span className="text-xs font-bold text-emerald-700">▲ +12% vs yesterday</span>
+                  </div>
+
+                  {/* Metric 2 */}
+                  <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+                    <span className="text-xs font-semibold text-slate-500 block mb-1">Average Wait Time</span>
+                    <div className="text-2xl font-black text-slate-900">18.4 Mins</div>
+                    <span className="text-xs font-bold text-emerald-700">▼ Reduced by 68% via Smart Slots</span>
+                  </div>
+
+                  {/* Metric 3 */}
+                  <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+                    <span className="text-xs font-semibold text-slate-500 block mb-1">DBT Payment Clearance</span>
+                    <div className="text-2xl font-black text-slate-900">₹3.44 Crores</div>
+                    <span className="text-xs font-bold text-blue-700">99.4% Disbursed within 24 hrs</span>
+                  </div>
+
+                </div>
+
+                {/* Multi-Centre Load & Capacity Table */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+                  <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+                    <h3 className="font-bold text-slate-900 text-sm">Centre Real-Time Capacity & Overcrowding Guard</h3>
+                    <span className="text-xs text-slate-500">Auto-flags &gt;80% capacity</span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-500 font-bold">
+                          <th className="pb-2">Centre Name</th>
+                          <th className="pb-2">Type</th>
+                          <th className="pb-2">Daily Quota</th>
+                          <th className="pb-2">Capacity Load</th>
+                          <th className="pb-2">Queue</th>
+                          <th className="pb-2">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {centres.map(c => {
+                          const loadPct = Math.round((c.currentLoadQtl / c.dailyCapacityQtl) * 100);
+                          const isHigh = loadPct >= 80;
+                          return (
+                            <tr key={c.id} className="hover:bg-slate-50">
+                              <td className="py-2.5 font-bold text-slate-900">{c.name}</td>
+                              <td className="py-2.5">
+                                <span className={`px-2 py-0.5 rounded font-bold ${c.type === 'IKP' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}`}>
+                                  {c.type}
+                                </span>
+                              </td>
+                              <td className="py-2.5 text-slate-600">{c.dailyCapacityQtl} Qtl</td>
+                              <td className="py-2.5">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-20 bg-slate-200 h-2 rounded-full overflow-hidden">
+                                    <div 
+                                      className={`h-full ${isHigh ? 'bg-red-500' : 'bg-emerald-500'}`}
+                                      style={{ width: `${loadPct}%` }}
+                                    ></div>
+                                  </div>
+                                  <span className="font-bold">{loadPct}%</span>
+                                </div>
+                              </td>
+                              <td className="py-2.5 font-semibold text-slate-800">{c.currentQueueCount} Farmers</td>
+                              <td className="py-2.5">
+                                {isHigh ? (
+                                  <span className="bg-red-100 text-red-800 font-bold px-2 py-0.5 rounded">High Load Alert</span>
+                                ) : (
+                                  <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded">Optimal</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Audit Logs Trail */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+                    <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                      <i data-lucide="shield" className="w-4 h-4 text-farmer-600"></i>
+                      Immutable Procurement Audit Log Trail
+                    </h3>
+                    <span className="text-[11px] text-slate-400">Synced to PostgreSQL Audit Table</span>
+                  </div>
+                  
+                  <div className="space-y-2 text-xs">
+                    <div className="p-2.5 bg-slate-50 rounded-lg flex items-center justify-between border border-slate-100">
+                      <div>
+                        <span className="font-bold text-slate-900">[AUDIT-084] Land Passbook Verification</span>
+                        <p className="text-slate-500">Farmer Ramesh Reddy • Passbook T-192837465 confirmed via Dharani Gateway</p>
+                      </div>
+                      <span className="text-slate-400 text-[11px]">Today 10:45 AM</span>
+                    </div>
+
+                    <div className="p-2.5 bg-slate-50 rounded-lg flex items-center justify-between border border-slate-100">
+                      <div>
+                        <span className="font-bold text-slate-900">[AUDIT-085] Token Generated & Scheduled</span>
+                        <p className="text-slate-500">Token KS-2026-IKP-0482 assigned to slot 11:30 AM at Warangal Rural IKP</p>
+                      </div>
+                      <span className="text-slate-400 text-[11px]">Today 11:02 AM</span>
+                    </div>
+
+                    <div className="p-2.5 bg-slate-50 rounded-lg flex items-center justify-between border border-slate-100">
+                      <div>
+                        <span className="font-bold text-slate-900">[AUDIT-086] Quality Inspection Completed</span>
+                        <p className="text-slate-500">Moisture recorded at 14.8% (FAQ Grade A). Officer OFF-TG-WAR-042</p>
+                      </div>
+                      <span className="text-slate-400 text-[11px]">Today 11:42 AM</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+          </main>
+
+          {/* ========================================================================= */}
+          {/* MODAL: REAL-TIME SMS LOG DRAWER                                          */}
+          {/* ========================================================================= */}
+          {showSmsModal && (
+            <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh]">
+                
+                <div className="bg-farmer-900 text-white p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <i data-lucide="message-square" className="w-5 h-5 text-amber-300"></i>
+                    <div>
+                      <h3 className="font-bold text-sm">Farmer Mobile SMS Inbox</h3>
+                      <p className="text-[11px] text-emerald-200">Delivered to +91 {farmerProfile.phone}</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setShowSmsModal(false)}
+                    className="text-white hover:text-amber-300 font-bold text-lg"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="p-4 overflow-y-auto space-y-3 flex-1">
+                  {smsMessages.map((msg) => (
+                    <div key={msg.id} className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-farmer-800 flex items-center gap-1">
+                          <i data-lucide="shield-check" className="w-3.5 h-3.5 text-emerald-600"></i>
+                          Govt-KisanSetu
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-medium">{msg.time}</span>
+                      </div>
+                      <p className="text-slate-800 leading-relaxed font-sans">{msg.text}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-3 bg-slate-100 border-t border-slate-200 text-center text-xs text-slate-500">
+                  Real-time SMS gateway simulation powered by KisanSetu dispatch service.
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* MODAL: SUPABASE DATABASE CONNECTION CONFIG                                */}
+          {/* ========================================================================= */}
+          {showSupabaseModal && (
+            <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 p-6">
+                <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <i data-lucide="database" className="w-5 h-5 text-emerald-600"></i>
+                    <h3 className="font-bold text-slate-900 text-base">Supabase PostgreSQL Config</h3>
+                  </div>
+                  <button onClick={() => setShowSupabaseModal(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+                </div>
+
+                <p className="text-xs text-slate-600 mb-4">
+                  The application is currently running with the built-in reactive state engine and schema file (<code className="text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded">supabase_schema.sql</code>).
+                </p>
+
+                <div className="space-y-3 text-xs mb-5">
+                  <div>
+                    <label className="font-semibold text-slate-700 block mb-1">Supabase Project URL</label>
+                    <input
+                      type="text"
+                      value={supabaseConfig.url}
+                      onChange={(e) => setSupabaseConfig({ ...supabaseConfig, url: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold text-slate-700 block mb-1">Supabase Anon Key</label>
+                    <input
+                      type="password"
+                      value={supabaseConfig.anonKey}
+                      onChange={(e) => setSupabaseConfig({ ...supabaseConfig, anonKey: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setSupabaseConfig({ ...supabaseConfig, connected: true });
+                      alert('Supabase client connection simulated successfully!');
+                      setShowSupabaseModal(false);
+                    }}
+                    className="flex-1 py-2.5 bg-farmer-600 hover:bg-farmer-700 text-white font-bold rounded-xl text-xs transition"
+                  >
+                    Save & Test Connection
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* DRAWER: KISANSETU AI ASSISTANT                                            */}
+          {/* ========================================================================= */}
+          {showAiDrawer && (
+            <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-sm flex justify-end">
+              <div className="bg-white w-full max-w-md h-full shadow-2xl flex flex-col">
+                
+                {/* AI Header */}
+                <div className="bg-farmer-900 text-white p-4 flex items-center justify-between border-b border-farmer-800">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-amber-400 text-slate-900 flex items-center justify-center font-extrabold text-sm">
+                      <i data-lucide="sparkles" className="w-4 h-4"></i>
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm">KisanSetu AI Assistant</h3>
+                      <p className="text-[11px] text-emerald-200">Connected to authenticated session</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowAiDrawer(false)} className="text-white hover:text-amber-300 font-bold text-lg">✕</button>
+                </div>
+
+                {/* AI Chat Messages */}
+                <div className="flex-1 p-4 overflow-y-auto space-y-3">
+                  {aiMessages.map((msg, index) => (
+                    <div 
+                      key={index} 
+                      className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div className={`max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed ${msg.sender === 'user' ? 'bg-farmer-600 text-white rounded-br-none' : 'bg-slate-100 text-slate-900 rounded-bl-none border border-slate-200'}`}>
+                        {msg.text}
+                        <div className={`text-[10px] mt-1 text-right ${msg.sender === 'user' ? 'text-emerald-200' : 'text-slate-400'}`}>
+                          {msg.time}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Prompt Suggestions */}
+                <div className="p-2 border-t border-slate-100 bg-slate-50 flex gap-1.5 overflow-x-auto no-scrollbar text-[11px]">
+                  <button 
+                    onClick={() => setAiInputText("Check my token & wait time")}
+                    className="px-2.5 py-1 bg-white rounded-full border border-slate-200 text-slate-700 whitespace-nowrap hover:bg-slate-100 font-medium"
+                  >
+                    Check my token
+                  </button>
+                  <button 
+                    onClick={() => setAiInputText("What is the official MSP rate for Paddy?")}
+                    className="px-2.5 py-1 bg-white rounded-full border border-slate-200 text-slate-700 whitespace-nowrap hover:bg-slate-100 font-medium"
+                  >
+                    Paddy MSP Rate
+                  </button>
+                  <button 
+                    onClick={() => setAiInputText("Nearest local IKP centre")}
+                    className="px-2.5 py-1 bg-white rounded-full border border-slate-200 text-slate-700 whitespace-nowrap hover:bg-slate-100 font-medium"
+                  >
+                    Nearest IKP Centre
+                  </button>
+                </div>
+
+                {/* AI Input Box */}
+                <div className="p-3 border-t border-slate-200 flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={aiInputText}
+                    onChange={(e) => setAiInputText(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSendAiMessage()}
+                    placeholder="Ask about token, queues, MSP..."
+                    className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-farmer-500"
+                  />
+                  <button
+                    onClick={handleSendAiMessage}
+                    className="p-2 bg-farmer-600 hover:bg-farmer-700 text-white rounded-xl transition shadow"
+                  >
+                    <i data-lucide="send" className="w-4 h-4"></i>
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* FOOTER */}
+          <footer className="bg-slate-900 text-slate-400 py-6 px-4 text-center text-xs border-t border-slate-800">
+            <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-slate-200 font-bold">
+                <i data-lucide="wheat" className="w-4 h-4 text-amber-400"></i>
+                <span>KisanSetu • Smart Agricultural Procurement Network</span>
+              </div>
+              <div>
+                Integrated with FCI, Markfed, PACS & Local IKP Centres • PWA 2026 Production Ready
+              </div>
+            </div>
+          </footer>
+
+        </div>
+      );
+    }
+
+    // Mount Application
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<KisanSetuApp />);
+  </script>
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').then((reg) => {
+          console.log('[KisanSetu] Service Worker registered successfully:', reg.scope);
+        }).catch((err) => {
+          console.log('[KisanSetu] Service Worker registration failed:', err);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
